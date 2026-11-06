@@ -412,7 +412,10 @@ export class ConfigSync extends LiveSyncCommands {
     }
 
     pluginDialog?: PluginDialogModal = undefined;
-    periodicPluginSweepProcessor = new PeriodicProcessor(this.core, async () => await this.scanAllConfigFiles(false));
+    periodicPluginSweepProcessor = new PeriodicProcessor(
+        this.core,
+        async () => !this._isMainSuspended() && (await this.scanAllConfigFiles(false))
+    );
 
     pluginList: IPluginDataExDisplay[] = [];
     private pluginListGeneration = 0;
@@ -1643,18 +1646,15 @@ export class ConfigSync extends LiveSyncCommands {
                     .filter((e) => this.isTargetPath(e))
                     .map((e) => ({ key: this.filenameToUnifiedKey(e), file: e }));
                 const virtualPathsOfLocalFiles = [...new Set(files.map((e) => e.key))];
-                const filesOnDB = (
-                    (
-                        await this.localDatabase.allDocsRaw({
-                            startkey: ICXHeader + "",
-                            endkey: `${ICXHeader}\u{10ffff}`,
-                            include_docs: true,
-                        })
-                    ).rows.map((e) => e.doc) as InternalFileEntry[]
-                ).filter((e) => !e.deleted);
-                let deleteCandidate = filesOnDB
-                    .map((e) => this.getPath(e))
-                    .filter((e) => e.startsWith(`${ICXHeader}${term}/`));
+                // Streamed so that only this terminal's keys are retained, not every device's document bodies.
+                let deleteCandidate: FilePathWithPrefix[] = [];
+                for await (const entry of this.localDatabase.findEntries(ICXHeader + "", `${ICXHeader}\u{10ffff}`, {
+                    include_docs: true,
+                })) {
+                    if (entry.deleted) continue;
+                    const path = this.getPath(entry);
+                    if (path.startsWith(`${ICXHeader}${term}/`)) deleteCandidate.push(path);
+                }
                 for (const vp of virtualPathsOfLocalFiles) {
                     const p = files.find((e) => e.key == vp)?.file;
                     if (!p) {

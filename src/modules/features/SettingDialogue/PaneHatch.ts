@@ -4,7 +4,6 @@ import {
     LOG_LEVEL_NOTICE,
     LOG_LEVEL_VERBOSE,
     type FilePath,
-    type EntryDoc,
     type diff_result,
 } from "@vrtmrz/livesync-commonlib/compat/common/types";
 import { createBlob, escapeMarkdownValue, readAsBlob } from "@vrtmrz/livesync-commonlib/compat/common/utils";
@@ -28,6 +27,7 @@ import type { ObsidianLiveSyncSettingTab } from "./ObsidianLiveSyncSettingTab.ts
 import type { PageFunctions } from "./SettingPane.ts";
 import { setButtonDestructiveState } from "./settingComponentStyles.ts";
 import { isNotFoundError } from "@vrtmrz/livesync-commonlib/compat/common/utils.doc";
+import { deleteAllCustomisationSyncData } from "@/serviceFeatures/customisationSyncCleanup.ts";
 import {
     chooseAndCopyFileDatabaseInfo,
     collectFileDatabaseInfoPaths,
@@ -1224,19 +1224,10 @@ export function paneHatch(this: ObsidianLiveSyncSettingTab, paneEl: HTMLElement,
                 .setDisabled(false)
                 .onClick(async () => {
                     Logger(`Deleting customization sync data`, LOG_LEVEL_NOTICE);
-                    const entriesToDelete = await this.core.localDatabase.allDocsRaw({
-                        startkey: "ix:",
-                        endkey: "ix:\u{10ffff}",
-                        include_docs: true,
-                    });
-                    const newData = entriesToDelete.rows.map((e) => ({
-                        ...e.doc,
-                        _deleted: true,
-                    })) as EntryDoc[];
-                    const r = await this.core.localDatabase.bulkDocsRaw(newData);
+                    const removed = await deleteAllCustomisationSyncData(this.core.localDatabase);
                     // Do not care about the result.
                     Logger(
-                        `${r.length} items have been removed, to confirm how many items are left, please perform it again.`,
+                        `${removed} items have been removed, to confirm how many items are left, please perform it again.`,
                         LOG_LEVEL_NOTICE
                     );
                 })

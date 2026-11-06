@@ -797,7 +797,7 @@ describe("conflict resolution serviceFeature", () => {
     });
 
     it("limits concurrent conflict checks and reports queued and active work", async () => {
-        const paths = Array.from({ length: 11 }, (_, index) => `concurrent-${index}.md` as FilePathWithPrefix);
+        const paths = Array.from({ length: 3 }, (_, index) => `concurrent-${index}.md` as FilePathWithPrefix);
         const harness = createHarness();
         const finishByPath = new Map<FilePathWithPrefix, () => void>();
         harness.tryAutoMerge.mockImplementation(
@@ -808,9 +808,9 @@ describe("conflict resolution serviceFeature", () => {
         );
 
         await Promise.all(paths.map(async (path) => await harness.conflict.queueCheckFor(path)));
-        await vi.waitFor(() => expect(harness.tryAutoMerge).toHaveBeenCalledTimes(10));
+        await vi.waitFor(() => expect(harness.tryAutoMerge).toHaveBeenCalledTimes(2));
 
-        expect(harness.conflict.conflictProcessQueueCount.value).toBe(11);
+        expect(harness.conflict.conflictProcessQueueCount.value).toBe(3);
         let allProcessed = false;
         const completion = harness.conflict.ensureAllProcessed().then((result) => {
             allProcessed = true;
@@ -822,7 +822,7 @@ describe("conflict resolution serviceFeature", () => {
         const finishFirst = finishByPath.get(paths[0]);
         finishByPath.delete(paths[0]);
         finishFirst?.();
-        await vi.waitFor(() => expect(harness.tryAutoMerge).toHaveBeenCalledTimes(11));
+        await vi.waitFor(() => expect(harness.tryAutoMerge).toHaveBeenCalledTimes(3));
         for (const finish of finishByPath.values()) finish();
 
         await expect(completion).resolves.toBe(true);
@@ -830,7 +830,7 @@ describe("conflict resolution serviceFeature", () => {
     });
 
     it("replaces an older same-path check while every resolver slot is occupied", async () => {
-        const occupiedPaths = Array.from({ length: 10 }, (_, index) => `occupied-${index}.md` as FilePathWithPrefix);
+        const occupiedPaths = Array.from({ length: 2 }, (_, index) => `occupied-${index}.md` as FilePathWithPrefix);
         const repeatedPath = "waiting-replacement.md" as FilePathWithPrefix;
         const harness = createHarness();
         const finishers: Array<{ path: FilePathWithPrefix; finish: () => void }> = [];
@@ -842,7 +842,7 @@ describe("conflict resolution serviceFeature", () => {
         );
 
         await Promise.all(occupiedPaths.map(async (path) => await harness.conflict.queueCheckFor(path)));
-        await vi.waitFor(() => expect(harness.tryAutoMerge).toHaveBeenCalledTimes(10));
+        await vi.waitFor(() => expect(harness.tryAutoMerge).toHaveBeenCalledTimes(2));
 
         await harness.conflict.queueCheckFor(repeatedPath);
         await harness.conflict.queueCheckFor(repeatedPath);
@@ -1188,26 +1188,26 @@ describe("conflict resolution serviceFeature", () => {
     );
 
     it("cancels unstarted checks after active checks settle during unload", async () => {
-        const paths = Array.from({ length: 11 }, (_, index) => `unload-concurrent-${index}.md` as FilePathWithPrefix);
+        const paths = Array.from({ length: 3 }, (_, index) => `unload-concurrent-${index}.md` as FilePathWithPrefix);
         const harness = createHarness();
-        const tenStarted = deferred<void>();
+        const allStarted = deferred<void>();
         const releaseResolvers = deferred<void>();
         const resolve = vi.fn(async (_path: FilePathWithPrefix) => {
-            if (resolve.mock.calls.length === 10) tenStarted.resolve(undefined);
+            if (resolve.mock.calls.length === 2) allStarted.resolve(undefined);
             await releaseResolvers.promise;
         });
         harness.conflict.resolve.setHandler(resolve, true);
 
         await Promise.all(paths.map(async (path) => await harness.conflict.queueCheckFor(path)));
-        await tenStarted.promise;
-        expect(harness.conflict.conflictProcessQueueCount.value).toBe(11);
+        await allStarted.promise;
+        expect(harness.conflict.conflictProcessQueueCount.value).toBe(3);
 
         const completion = harness.conflict.ensureAllProcessed();
         harness.context.events.emitEvent(EVENT_PLUGIN_UNLOADED);
         releaseResolvers.resolve(undefined);
 
         await expect(completion).resolves.toBe(false);
-        expect(resolve).toHaveBeenCalledTimes(10);
+        expect(resolve).toHaveBeenCalledTimes(2);
         expect(harness.conflict.conflictProcessQueueCount.value).toBe(1);
     });
 
@@ -1285,20 +1285,20 @@ describe("conflict resolution serviceFeature", () => {
         const harness = createHarness({ settings: { syncAfterMerge: false } });
         const paths = Array.from({ length: 10 }, (_, index) => `requeue-${index}.md` as FilePathWithPrefix);
         const firstChecks = new Set<FilePathWithPrefix>();
-        const finishers: Array<() => void> = [];
+        const occupiedSlots = deferred<void>();
+        let blocking = 2;
         harness.tryAutoMerge.mockImplementation(async (path: FilePathWithPrefix) => {
             if (firstChecks.has(path)) return { ok: NOT_CONFLICTED };
             firstChecks.add(path);
-            await new Promise<void>((resolve) => {
-                finishers.push(resolve);
-            });
+            // Only the paths holding the slots wait, so the requeued checks drain without deadlock.
+            if (blocking-- > 0) await occupiedSlots.promise;
             return { ok: AUTO_MERGED };
         });
 
         await Promise.all(paths.map((path) => harness.conflict.queueCheckFor(path)));
-        await vi.waitFor(() => expect(finishers).toHaveLength(10));
+        await vi.waitFor(() => expect(harness.tryAutoMerge).toHaveBeenCalledTimes(2));
         const completion = harness.conflict.ensureAllProcessed();
-        for (const finish of finishers) finish();
+        occupiedSlots.resolve(undefined);
 
         await expect(completion).resolves.toBe(true);
         for (const path of paths) {

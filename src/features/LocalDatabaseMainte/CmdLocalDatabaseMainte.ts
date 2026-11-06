@@ -185,10 +185,16 @@ Do you want to resurrect these chunks?`;
         if (!(await this.ensureAvailable("Delete Files"))) return;
         const p = this._progress("", LOG_LEVEL_NOTICE);
         p.log("Searching for deleted files..");
-        const docs = await this.database.allDocs<MetaEntry>({ include_docs: true });
-        const deletedDocs = docs.rows.filter(
-            (e) => (e.doc?.type == "newnote" || e.doc?.type == "plain") && e.doc?.deleted
-        );
+        // Page over the metadata key ranges only; the "h:" range holds chunk bodies.
+        const deletedDocs: MetaEntry[] = [];
+        for (const [startKey, endKey] of [
+            ["", "h:"],
+            ["h:\u{10ffff}", ""],
+        ] as const) {
+            for await (const doc of this.localDatabase.findEntries(startKey, endKey, { include_docs: true })) {
+                if (doc.deleted) deletedDocs.push(doc);
+            }
+        }
         if (deletedDocs.length == 0) {
             p.done("No deleted files found.");
             return;
@@ -207,7 +213,7 @@ Note: **Make sure to synchronise all devices before deletion.**
 > This operation affects the database permanently. Deleted files will not be recovered after this operation.
 > And, the chunks that are used in the deleted files will be ready for compaction.`;
 
-        const deletingDocs = deletedDocs.map((e) => ({ ...e.doc, _deleted: true }) as MetaEntry);
+        const deletingDocs = deletedDocs.map((e) => ({ ...e, _deleted: true }));
 
         if (await this.confirm("Delete Files", message, "Delete", "Cancel")) {
             const result = await this.database.bulkDocs(deletingDocs);
@@ -496,21 +502,23 @@ Are you ready to delete unused chunks?`;
             return;
         }
         const { unusedSet, chunkSet } = await this.scanUnusedChunks();
-        const deleteChunks = await this.database.allDocs({
-            keys: [...unusedSet],
-            include_docs: true,
-        });
-        for (const chunk of deleteChunks.rows) {
-            if ((chunk as { value?: { deleted?: boolean } })?.value?.deleted) {
-                chunkSet.delete(chunk.key as DocumentID);
+        const deleteDocs: EntryLeaf[] = [];
+        for (const keyBatch of arrayToChunkedArray([...unusedSet], 100)) {
+            const deleteChunks = await this.database.allDocs({
+                keys: keyBatch,
+                include_docs: true,
+            });
+            for (const chunk of deleteChunks.rows) {
+                if ((chunk as { value?: { deleted?: boolean } })?.value?.deleted) {
+                    chunkSet.delete(chunk.key as DocumentID);
+                }
+            }
+            for (const row of deleteChunks.rows) {
+                if ("doc" in row) {
+                    deleteDocs.push({ ...(row as { doc?: EntryLeaf }).doc!, _deleted: true });
+                }
             }
         }
-        const deleteDocs = deleteChunks.rows
-            .filter((e) => "doc" in e)
-            .map((e) => ({
-                ...(e as { doc?: EntryLeaf }).doc!,
-                _deleted: true,
-            }));
 
         this._log(`Deleting chunks: ${deleteDocs.length}`, logLevel);
         const deleteChunkBatch = arrayToChunkedArray(deleteDocs, 100);
@@ -641,6 +649,9 @@ Success: ${successCount}, Errored: ${errored}`;
     //     }
     // }
     async gcv3() {
+        await withLock("gc-v3", async () => await this.performGCV3());
+    }
+    private async performGCV3() {
         const replicator = this.core.replicator;
         if (this.settings.remoteType !== REMOTE_COUCHDB || !canRunCouchDBGarbageCollection(replicator)) return;
         if (!(await this.ensureAvailable("Garbage Collection"))) return;
@@ -745,6 +756,7 @@ This may indicate that some devices have not completed synchronisation, which co
 
         const unusedChunks = [...allChunks.entries()].filter(([chunkId]) => !usedChunks.has(chunkId));
         this._notice(`Garbage Collection: Found ${unusedChunks.length} unused chunks to delete.`, "gc-scanning");
+        const unusedChunkCount = unusedChunks.length;
         const deleteChunkDocs = unusedChunks.map(
             ([chunkId, chunk]) =>
                 ({
@@ -753,11 +765,18 @@ This may indicate that some devices have not completed synchronisation, which co
                     _rev: chunk._rev,
                 }) as EntryLeaf
         );
-        const response = await localDatabase.bulkDocs(deleteChunkDocs);
-        const deletedCount = response.filter((e) => "ok" in e).length;
+        // Release the chunk bodies before the replication and compaction phase; only the tombstones are needed.
+        allChunks.clear();
+        usedChunks.clear();
+        unusedChunks.length = 0;
+        let deletedCount = 0;
+        for (const batch of arrayToChunkedArray(deleteChunkDocs, 100)) {
+            const response = await localDatabase.bulkDocs(batch);
+            deletedCount += response.filter((e) => "ok" in e).length;
+        }
         const gcEndTime = Date.now();
         this._notice(
-            `Garbage Collection completed. Deleted chunks: ${deletedCount} / ${unusedChunks.length}. Time taken: ${(gcEndTime - gcStartTime) / 1000} seconds.`
+            `Garbage Collection completed. Deleted chunks: ${deletedCount} / ${unusedChunkCount}. Time taken: ${(gcEndTime - gcStartTime) / 1000} seconds.`
         );
         // Send changes to remote
         const r = await replicator.openOneShotReplication(this.settings, false, false, "pushOnly");
@@ -769,5 +788,12 @@ This may indicate that some devices have not completed synchronisation, which co
         // Perform compaction
         await this.compactDatabase();
         this.clearHash();
+        // Drop the revisions left behind by the chunk tombstones above. Only this user-confirmed flow may compact.
+        const localCompactionStartTime = Date.now();
+        await this.localDatabase.localDatabase.compact();
+        this._log(
+            `Local database compaction completed. Time taken: ${(Date.now() - localCompactionStartTime) / 1000} seconds.`,
+            LOG_LEVEL_VERBOSE
+        );
     }
 }

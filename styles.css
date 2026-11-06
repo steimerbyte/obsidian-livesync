@@ -163,7 +163,7 @@ div.sls-setting-menu-btn {
     flex-grow: 1;
     position: sticky;
     top: 0;
-    backdrop-filter: blur(15px);
+    background-color: var(--background-primary);
     padding: 4px;
     border-radius: 10px;
     z-index: 10;
@@ -205,17 +205,6 @@ body {
     justify-content: center;
     align-items: center;
     /* transition: background-position 1s; */
-    animation: sls-scroll-warn 1s linear 0s infinite;
-}
-
-@keyframes sls-scroll-warn {
-    0% {
-        background-position: 0 0;
-    }
-
-    100% {
-        background-position: 30px 0;
-    }
 }
 
 .sls-setting-menu-buttons label {
@@ -505,8 +494,6 @@ div.workspace-leaf-content[data-type="bases"] .livesync-status {
 
 .livesync-status div {
     opacity: 0.6;
-    -webkit-filter: grayscale(100%);
-    filter: grayscale(100%);
 }
 
 .livesync-status .livesync-status-loghistory {
@@ -523,8 +510,6 @@ div.workspace-leaf-content[data-type="bases"] .livesync-status {
     color: var(--text-on-accent);
     border: 1px solid var(--background-modifier-error);
     background-color: rgba(var(--background-modifier-error-rgb), 0.2);
-    -webkit-filter: unset;
-    filter: unset;
     width: fit-content;
     margin-left: auto;
 }

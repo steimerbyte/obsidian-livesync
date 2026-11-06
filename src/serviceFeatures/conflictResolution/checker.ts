@@ -43,9 +43,9 @@ export function createConflictCheckingHandlers(dependencies: ConflictCheckingDep
                 dependencies.log(error, LOG_LEVEL_VERBOSE);
             }
         },
-        // The resolver serialises shared user interactions; independent checks
-        // and automatic merges can use the remaining execution slots.
-        concurrency: 10,
+        // The resolver serialises shared user interactions, so one extra slot is enough;
+        // each check holds every conflicted leaf plus three note bodies, so this bounds memory.
+        concurrency: 2,
         onProgress(remaining) {
             // Accepted checks still update their accounting as they settle.
             dependencies.conflictProcessQueueCount.value = remaining;

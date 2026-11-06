@@ -19,6 +19,17 @@ const fixture = `
 `;
 
 describe("production minifier", () => {
+    it("keeps reflective names and top-level bindings outside the mangler", () => {
+        const mangle = terserOption.mangle as { toplevel?: boolean; properties?: boolean; eval?: boolean };
+        const compress = terserOption.compress as { passes?: number };
+        expect(terserOption.keep_fnames).toBe(true);
+        expect(terserOption.keep_classnames).toBe(true);
+        expect(mangle.toplevel).toBe(false);
+        expect(mangle.properties).toBe(false);
+        expect(mangle.eval).toBe(false);
+        expect(compress.passes).toBe(2);
+    });
+
     it("shortens local identifiers while preserving host properties, module names, and diagnostics", async () => {
         const result = await minify(fixture, { ...terserOption, sourceMap: false });
         expect(result.code).toBeDefined();

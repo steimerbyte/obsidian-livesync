@@ -34,7 +34,7 @@ const terserOption = {
         inline: false,
         join_vars: true,
         loops: true,
-        passes: 1,
+        passes: 2,
         reduce_vars: true,
         reduce_funcs: false,
         arrows: true,

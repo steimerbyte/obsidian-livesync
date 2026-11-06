@@ -529,6 +529,17 @@ describe("interactive conflict resolution operations", () => {
         expect(emit).not.toHaveBeenCalled();
     });
 
+    it("does not inspect or publish conflict state for a path which is neither active nor postponed", async () => {
+        const fixture = createOperations();
+        const emit = vi.spyOn(fixture.context.events, "emitEvent");
+
+        await fixture.operations.refreshConflictState("other.md" as FilePathWithPrefix);
+
+        expect(fixture.getActiveFilePath).toHaveBeenCalledOnce();
+        expect(fixture.getConflictedRevs).not.toHaveBeenCalled();
+        expect(emit).not.toHaveBeenCalled();
+    });
+
     it("does not requeue a changed comparison when its conflict refresh finishes after disposal", async () => {
         let finishInspection!: (revisions: string[]) => void;
         const pendingInspection = new Promise<string[]>((resolve) => {

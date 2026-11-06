@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { LOG_LEVEL_INFO } from "@vrtmrz/livesync-commonlib/compat/common/types";
 
 vi.mock("@/deps.ts", () => ({
     addIcon: vi.fn(),
@@ -41,6 +42,7 @@ async function createHarness() {
             onLoaded: allFunction<() => Promise<boolean>>(),
             onBeforeUnload: allFunction<() => Promise<boolean>>(),
         },
+        vault: { getVaultName: () => "test-vault" },
     };
     const core = { services, settings: {} };
     const module = new ModuleLog({ app: {} } as never, core as never);
@@ -49,7 +51,7 @@ async function createHarness() {
     vi.spyOn(module, "adjustStatusDivPosition").mockImplementation(() => undefined);
     module.onBindFunction(core as never, services as never);
     const { Logger } = await import("octagonal-wheels/common/logger");
-    return { module, services, sink, Logger };
+    return { module, services, core, sink, Logger };
 }
 
 describe("ModuleLog service connection", () => {
@@ -313,4 +315,67 @@ describe("ModuleLog service connection", () => {
             }
         }
     );
+});
+
+describe("ModuleLog on-editor log history", () => {
+    beforeEach(() => {
+        vi.resetModules();
+        vi.stubGlobal("document", { querySelectorAll: () => [] });
+    });
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        vi.useRealTimers();
+    });
+
+    it("does not collect log lines while the longer log is disabled", async () => {
+        const { module, core, sink } = await createHarness();
+        sink.mockRestore(); // call the real __addLog
+        core.settings = { showLongerLogInsideEditor: false } as never;
+        for (let i = 0; i < 300; i++) module.__addLog(`message ${i}`, LOG_LEVEL_INFO);
+        expect(module.logLines).toHaveLength(0);
+        core.settings = {} as never; // shipped default path, property absent
+        for (let i = 0; i < 300; i++) module.__addLog(`message ${i}`, LOG_LEVEL_INFO);
+        expect(module.logLines).toHaveLength(0);
+    });
+
+    it("keeps the longer log bounded while it is enabled", async () => {
+        const { module, core, sink } = await createHarness();
+        sink.mockRestore();
+        core.settings = { showLongerLogInsideEditor: true } as never;
+        for (let i = 0; i < 300; i++) module.__addLog(`message ${i}`, LOG_LEVEL_INFO);
+        expect(module.logLines).toHaveLength(200);
+        expect(module.logLines[0].message).toContain("message 100");
+        expect(module.logLines[199].message).toContain("message 299");
+    });
+
+    it("renders the live history newest-first and drops expired entries", async () => {
+        vi.useFakeTimers();
+        vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
+            callback();
+            return 1;
+        });
+        const { module, core, sink } = await createHarness();
+        sink.mockRestore();
+        core.settings = {
+            showLongerLogInsideEditor: true,
+            showStatusOnEditor: true,
+            showOnlyIconsOnEditor: false,
+        } as never;
+        module.statusBarLabels = {
+            value: { message: "", status: "", parts: [], statusBarParts: [] },
+        } as never;
+        module.statusDiv = { setCssStyles: vi.fn() } as never;
+        module.logHistory = { innerText: "" } as unknown as HTMLDivElement;
+        module.logMessage = { innerText: "" } as never;
+        module.logLines.unshift({ ttl: 0, message: "expired" });
+        module.__addLog("first", LOG_LEVEL_INFO);
+        module.__addLog("second", LOG_LEVEL_INFO);
+        module.applyStatusBarText();
+        expect(module.logLines).toHaveLength(2);
+        expect(module.logLines.some((e) => e.message === "expired")).toBe(false);
+        const rendered = module.logHistory!.innerText.split("\n");
+        expect(rendered).toHaveLength(2);
+        expect(rendered[0]).toContain("second");
+        expect(rendered[1]).toContain("first");
+    });
 });

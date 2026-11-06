@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+    DEFAULT_SETTINGS,
     type DocumentID,
     LOG_LEVEL_NOTICE,
     type FilePath,
@@ -31,6 +32,7 @@ vi.mock("./configureHiddenFileSyncMode.ts", () => ({
     configureHiddenFileSyncMode: vi.fn(),
 }));
 
+import { ICHeader, ICHeaderEnd } from "@vrtmrz/livesync-commonlib/compat/common/models/fileaccess.const";
 import { HiddenFileSync } from "./CmdHiddenFileSync.ts";
 import { configureHiddenFileSyncMode } from "./configureHiddenFileSyncMode.ts";
 
@@ -731,5 +733,99 @@ describe("HiddenFileSync exact revision repair operations", () => {
         ).resolves.toBe(false);
 
         expect(databaseFileAccess.fetchEntryFromMeta).not.toHaveBeenCalled();
+    });
+});
+
+describe("HiddenFileSync periodic hidden file scan", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it.each([
+        { suspended: true, expected: 0 },
+        { suspended: false, expected: 1 },
+    ])("runs $expected periodic storage scan(s) when suspended is $suspended", async ({ suspended, expected }) => {
+        vi.spyOn(HiddenFileSync.prototype, "onBindFunction").mockImplementation(() => {});
+        const core = {
+            settings: { ...DEFAULT_SETTINGS, syncInternalFiles: true },
+            services: {
+                API: { addLog: vi.fn(), setInterval: vi.fn(() => 0), clearInterval: vi.fn() },
+                context: { app: {} },
+            },
+        };
+        const hiddenFileSync = new HiddenFileSync(core as unknown as ConstructorParameters<typeof HiddenFileSync>[0]);
+        const scanAllStorageChanges = vi.fn(async () => true);
+        // The mocked base class ignores its constructor arguments, so the core fixture is bound directly.
+        Object.assign(hiddenFileSync, {
+            core,
+            _log: vi.fn(),
+            scanAllStorageChanges,
+            _isDatabaseReady: () => true,
+            _isMainSuspended: () => suspended,
+        });
+
+        await hiddenFileSync.periodicInternalFileScanProcessor.process();
+
+        expect(scanAllStorageChanges).toHaveBeenCalledTimes(expected);
+    });
+});
+
+describe("HiddenFileSync database file enumeration", () => {
+    function createEntry(index: number, deleted = false): MetaEntry {
+        const path = `.obsidian/plugins/example/file-${index}.json` as FilePath;
+        return {
+            _id: `i:${path}` as DocumentID,
+            _rev: `${index}-rev`,
+            path: `i:${path}` as FilePathWithPrefix,
+            type: "plain",
+            datatype: "plain",
+            ctime: index,
+            mtime: index,
+            size: index,
+            children: [],
+            eden: {},
+            deleted,
+        } as MetaEntry;
+    }
+    function toRow(doc: MetaEntry) {
+        return { id: doc._id, key: doc._id, value: { rev: doc._rev }, doc };
+    }
+
+    it("merges two sequential allDocs pages and keeps deleted entries", async () => {
+        const firstPage = Array.from({ length: 1000 }, (_, index) => toRow(createEntry(index)));
+        const secondPage = [toRow(createEntry(1000)), toRow(createEntry(1001, true))];
+        const allDocsRaw = vi
+            .fn()
+            .mockResolvedValueOnce({ rows: firstPage })
+            .mockResolvedValueOnce({ rows: secondPage });
+        const hiddenFileSync = Object.create(HiddenFileSync.prototype) as HiddenFileSync;
+        Object.assign(hiddenFileSync, {
+            localDatabase: { allDocsRaw },
+            getPath: (entry: MetaEntry) => entry.path,
+            isTargetFile: vi.fn(async () => true),
+        });
+
+        const files = await hiddenFileSync.getAllDatabaseFiles();
+
+        expect(allDocsRaw).toHaveBeenCalledTimes(2);
+        expect(allDocsRaw.mock.calls[0][0]).toMatchObject({
+            startkey: ICHeader,
+            endkey: ICHeaderEnd,
+            include_docs: true,
+            limit: 1000,
+            skip: 0,
+        });
+        expect(allDocsRaw.mock.calls[1][0]).toMatchObject({
+            startkey: firstPage[999].id,
+            endkey: ICHeaderEnd,
+            include_docs: true,
+            limit: 1000,
+            skip: 1,
+        });
+        expect(files.map((entry) => entry._id)).toEqual([
+            ...firstPage.map((row) => row.id),
+            ...secondPage.map((row) => row.id),
+        ]);
+        expect(files[files.length - 1].deleted).toBe(true);
     });
 });

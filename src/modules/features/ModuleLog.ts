@@ -264,10 +264,14 @@ export class ModuleLog extends AbstractObsidianModule {
         });
         this.statusBarLabels = statusBarLabels;
 
-        const applyToDisplay = throttle((label: typeof statusBarLabels.value) => {
-            // const v = label;
-            this.applyStatusBarText();
-        }, 20);
+        // Mobile repaints a full-width overlay; the desktop cadence is far too hot for it.
+        const applyToDisplay = throttle(
+            (label: typeof statusBarLabels.value) => {
+                // const v = label;
+                this.applyStatusBarText();
+            },
+            this.services.API.isMobile() ? 250 : 20
+        );
         statusBarLabels.onChanged((label) => applyToDisplay(label.value));
         this.activeFileStatus.onChanged(() => this.updateMessageArea());
     }
@@ -391,7 +395,7 @@ export class ModuleLog extends AbstractObsidianModule {
         }
         this.nextFrameQueue = compatGlobal.requestAnimationFrame(() => {
             this.nextFrameQueue = undefined;
-            const { message, status } = this.statusBarLabels.value;
+            const { message, status, parts, statusBarParts } = this.statusBarLabels.value;
             // const recent = logMessages.value;
             const newMsg = message;
             let newLog = this.settings?.showOnlyIconsOnEditor ? "" : status;
@@ -400,7 +404,6 @@ export class ModuleLog extends AbstractObsidianModule {
                 newLog = newLog.substring(moduleTagEnd + MARK_LOG_SEPARATOR.length + 1);
             }
 
-            const { parts, statusBarParts } = this.statusBarLabels.value;
             this.statusBarRenderer?.render(statusBarParts);
             if (this.statusDiv) {
                 this.statusDiv.setCssStyles({ display: this.settings?.showStatusOnEditor ? "" : "none" });
@@ -589,7 +592,13 @@ ${stringifyYaml(info)}
         if (!this.settings?.showOnlyIconsOnEditor) {
             this.statusLog.value = messageContent;
         }
-        this.logLines.push({ ttl: now.getTime() + 3000, message: newMessage });
+        if (this.settings?.showLongerLogInsideEditor) {
+            this.logLines.push({ ttl: now.getTime() + 3000, message: newMessage });
+            // The history is only rendered while the longer log is enabled; keep it bounded like logForDisplay.
+            while (this.logLines.length > 200) {
+                this.logLines.shift();
+            }
+        }
 
         if (level >= LOG_LEVEL_NOTICE) {
             if (!key) key = messageContent;

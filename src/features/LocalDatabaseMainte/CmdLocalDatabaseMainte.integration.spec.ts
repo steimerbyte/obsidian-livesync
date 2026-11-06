@@ -196,6 +196,7 @@ describe("LocalDatabaseMaintenance Garbage Collection V3 with CouchDB", () => {
                 },
                 localDatabase: liveSyncDatabase,
                 _notice: notice,
+                _log: vi.fn(),
             });
             vi.spyOn(maintenance, "ensureAvailable").mockResolvedValue(true);
             const clearHash = vi.spyOn(maintenance, "clearHash").mockImplementation(() => undefined);

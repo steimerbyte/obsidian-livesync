@@ -36,6 +36,7 @@ import { $msg } from "@/common/translation";
 
 const KV_KEY_REPLICATION_RESULT_PROCESSOR_SNAPSHOT = "replicationResultProcessorSnapshot";
 const REPROCESS_BATCH_SIZE = 100;
+const SNAPSHOT_THROTTLE_MS = 1000;
 type ReplicateResultProcessorSettings = Pick<
     ObsidianLiveSyncSettings,
     "maxMTimeForReflectEvents" | "suspendParseReplicationResult"
@@ -176,8 +177,8 @@ export class ReplicateResultProcessor {
      */
     protected async _takeSnapshot() {
         const snapshot = {
-            queued: this._queuedChanges.slice(),
-            processing: this._processingChanges.slice(),
+            queued: Array.from(this._queuedChanges.values()),
+            processing: Array.from(this._processingChanges),
         } satisfies ReplicateResultProcessorState;
         await this.context.getKeyValueDB().set(KV_KEY_REPLICATION_RESULT_PROCESSOR_SNAPSHOT, snapshot);
         this.log(
@@ -190,12 +191,14 @@ export class ReplicateResultProcessor {
      * Trigger taking a snapshot.
      */
     protected _triggerTakeSnapshot() {
+        // A drained queue is already persisted by the awaiting snapshot in `parseDocumentChange`.
+        if (this._queuedChanges.size === 0 && this._processingChanges.size === 0) return;
         fireAndForget(() => this._takeSnapshot());
     }
     /**
      * Throttled version of triggerTakeSnapshot.
      */
-    protected triggerTakeSnapshot = throttle(() => this._triggerTakeSnapshot(), 50);
+    protected triggerTakeSnapshot = throttle(() => this._triggerTakeSnapshot(), SNAPSHOT_THROTTLE_MS);
 
     /**
      * Restore from snapshot.
@@ -207,8 +210,8 @@ export class ReplicateResultProcessor {
             .get<ReplicateResultProcessorState>(KV_KEY_REPLICATION_RESULT_PROCESSOR_SNAPSHOT);
         if (snapshot) {
             // Restoring the snapshot re-runs processing for both queued and processing items.
-            const newQueue = [...snapshot.processing, ...snapshot.queued, ...this._queuedChanges];
-            this._queuedChanges = [];
+            const newQueue = [...snapshot.processing, ...snapshot.queued, ...this._queuedChanges.values()];
+            this._queuedChanges.clear();
             this.enqueueAll(newQueue);
             this.log(
                 `Restored from snapshot (${snapshot.processing.length + snapshot.queued.length} items)`,
@@ -247,7 +250,7 @@ export class ReplicateResultProcessor {
      */
     protected reportStatus() {
         this.services.replication.replicationResultCount.value =
-            this._queuedChanges.length + this._processingChanges.length;
+            this._queuedChanges.size + this._processingChanges.size;
     }
 
     /**
@@ -331,14 +334,16 @@ export class ReplicateResultProcessor {
     }
 
     /**
-     * Queue of changes to be processed.
+     * Queue of changes to be processed, keyed by document id. A `Map` keeps
+     * coalescing and removal O(1) while preserving insertion order.
      */
-    private _queuedChanges: PouchDB.Core.ExistingDocument<EntryDoc>[] = [];
+    private _queuedChanges: Map<string, PouchDB.Core.ExistingDocument<EntryDoc>> = new Map();
 
     /**
-     * List of changes being processed.
+     * Documents being processed. Keyed by identity because the same document id
+     * may be in flight more than once.
      */
-    private _processingChanges: PouchDB.Core.ExistingDocument<EntryDoc>[] = [];
+    private _processingChanges: Set<PouchDB.Core.ExistingDocument<EntryDoc>> = new Set();
 
     private _processingActivity?: Promise<void>;
     private _processingActivityDone?: PromiseWithResolvers<void>;
@@ -348,7 +353,7 @@ export class ReplicateResultProcessor {
             this._processingActivityDone?.resolve();
             return;
         }
-        const hasPendingDocuments = this._queuedChanges.length > 0 || this._processingChanges.length > 0;
+        const hasPendingDocuments = this._queuedChanges.size > 0 || this._processingChanges.size > 0;
         if (!hasPendingDocuments) {
             this._processingActivityDone?.resolve();
             return;
@@ -376,7 +381,7 @@ export class ReplicateResultProcessor {
      */
     protected enqueueChange(doc: PouchDB.Core.ExistingDocument<EntryDoc>) {
         if (this.waitingForDatabaseReset) return;
-        const old = this._queuedChanges.find((e) => e._id == doc._id);
+        const old = this._queuedChanges.get(doc._id);
         const path = "path" in doc ? this.getPath(doc) : "<unknown>";
         const docNote = `${path} (${shortenId(doc._id)}, ${shortenRev(doc._rev)})`;
         if (old) {
@@ -389,14 +394,14 @@ export class ReplicateResultProcessor {
             const isDeletedBefore = old._deleted === true || ("deleted" in old && old.deleted === true);
             const isDeletedNow = doc._deleted === true || ("deleted" in doc && doc.deleted === true);
 
-            // Replace the old queued change (This may performed batched updates, actually process performed always with the latest version, hence we can simply replace it if the change is the same type).
             if (isDeletedBefore === isDeletedNow) {
-                this._queuedChanges = this._queuedChanges.filter((e) => e._id != doc._id);
                 this.log(`[Enqueue] requeued: ${docNote} (from rev: ${shortenRev(oldRev)})`, LOG_LEVEL_VERBOSE);
             }
+            // Only the latest received state matters; the superseded one is dropped.
+            this._queuedChanges.delete(doc._id);
         }
         // Enqueue the change
-        this._queuedChanges.push(doc);
+        this._queuedChanges.set(doc._id, doc);
         this.reportStatus();
         this.updateProcessingActivity();
         this.triggerTakeSnapshot();
@@ -411,8 +416,9 @@ export class ReplicateResultProcessor {
     }
 
     /**
-     * Semaphore to limit concurrent processing.
-     * This is the per-id semaphore + concurrency-control (max 10 concurrent = 10 documents being processed at the same time).
+     * Semaphore limiting the concurrent application work. The ten slots are shared
+     * between the dequeue loop and `applyToDatabase`; the loop waits here only while
+     * every slot is in use.
      */
     private _semaphore = Semaphore(10);
 
@@ -421,6 +427,13 @@ export class ReplicateResultProcessor {
      */
     private _isRunningProcessQueue: boolean = false;
 
+    private dequeueChange() {
+        const next = this._queuedChanges.values().next();
+        if (next.done) return undefined;
+        this._queuedChanges.delete(next.value._id);
+        return next.value;
+    }
+
     /**
      * Process the queued changes.
      */
@@ -428,27 +441,27 @@ export class ReplicateResultProcessor {
         // Avoid re-entrance, suspend processing, or empty queue loop consumption.
         if (this._isRunningProcessQueue) return;
         if (this.isSuspended) return;
-        if (this._queuedChanges.length == 0) return;
+        if (this._queuedChanges.size == 0) return;
         try {
             this._isRunningProcessQueue = true;
-            while (this._queuedChanges.length > 0) {
+            while (this._queuedChanges.size > 0) {
                 // If getting suspended, bail the loop. Some concurrent tasks may still be running.
                 if (this.isSuspended) {
                     this.log(
-                        `Processing has got suspended. Remaining items in queue: ${this._queuedChanges.length}`,
+                        `Processing has got suspended. Remaining items in queue: ${this._queuedChanges.size}`,
                         LOG_LEVEL_INFO
                     );
                     break;
                 }
 
-                // Acquire semaphore for new processing slot
-                // (per-document serialisation caps concurrency).
+                // Wait for an application slot so this loop cannot outrun `applyToDatabase`.
+                // The permit is returned at once because `applyToDatabase` takes its own.
                 const releaser = await this._semaphore.acquire();
                 releaser();
                 // Dequeue the next change
-                const doc = this._queuedChanges.shift();
+                const doc = this.dequeueChange();
                 if (doc) {
-                    this._processingChanges.push(doc);
+                    this._processingChanges.add(doc);
                     void this.parseDocumentChange(doc);
                 }
                 // Take snapshot (to be restored on next startup if needed)
@@ -505,12 +518,12 @@ export class ReplicateResultProcessor {
             return;
         } finally {
             // Remove from processing queue
-            this._processingChanges = this._processingChanges.filter((e) => e !== change);
+            this._processingChanges.delete(change);
             // Queue visibility must not wait for persisting a recovery snapshot. Consumers
             // use this count to decide whether the reflected Vault is ready for interaction.
             this.reportStatus();
             try {
-                if (this._queuedChanges.length === 0 && this._processingChanges.length === 0) {
+                if (this._queuedChanges.size === 0 && this._processingChanges.size === 0) {
                     try {
                         await this._takeSnapshot();
                     } catch (error) {

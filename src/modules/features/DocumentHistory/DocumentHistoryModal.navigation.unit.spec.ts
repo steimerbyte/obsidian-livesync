@@ -318,4 +318,24 @@ describe("DocumentHistoryModal cyclic navigation", () => {
         expect(searchPrevBtn.disabled).toBe(true);
         expect(searchNextBtn.disabled).toBe(true);
     });
+
+    it("coalesces repeated revision slider input into one trailing load", () => {
+        vi.useFakeTimers();
+        try {
+            const modal = Object.assign(createHistoryModal(), { loadRevs: vi.fn() });
+            const scheduleLoad = vi.mocked(scheduleOnceIfDuplicated);
+            scheduleLoad.mockClear();
+
+            modal.scheduleLoadRevs();
+            modal.scheduleLoadRevs();
+            modal.scheduleLoadRevs();
+            expect(scheduleLoad).not.toHaveBeenCalled();
+
+            vi.advanceTimersByTime(275);
+            expect(scheduleLoad).toHaveBeenCalledTimes(1);
+            expect(modal.loadRevs).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
 });

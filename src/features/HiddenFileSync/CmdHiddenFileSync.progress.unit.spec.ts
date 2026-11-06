@@ -72,6 +72,14 @@ function createStoragePaths(count: number): FilePath[] {
     return Array.from({ length: count }, (_, index) => `.obsidian/plugins/example/${index}.json` as FilePath);
 }
 
+async function waitForCondition(predicate: () => boolean, message: string) {
+    for (let attempt = 0; attempt < 30; attempt++) {
+        if (predicate()) return;
+        await Promise.resolve();
+    }
+    throw new Error(message);
+}
+
 function createDatabaseEntries(count: number): MetaEntry[] {
     return Array.from(
         { length: count },
@@ -186,7 +194,7 @@ describe("HiddenFileSync batch progress consumers", () => {
         expect(progress.done).toHaveBeenCalledTimes(1);
     });
 
-    it("starts all storage work eagerly and calls done only after all promises resolve", async () => {
+    it("starts at most ten storage items and calls done only after all promises resolve", async () => {
         const { hiddenFileSync, progress, trackStorageFileModification } = createHiddenFileSync();
         const files = createStoragePaths(101);
         const resolveModifications: Array<(result: boolean) => void> = [];
@@ -195,12 +203,24 @@ describe("HiddenFileSync batch progress consumers", () => {
         );
 
         const operation = hiddenFileSync.trackScannedStorageChanges(files);
-        expect(trackStorageFileModification).toHaveBeenCalledTimes(files.length);
+        await waitForCondition(
+            () => trackStorageFileModification.mock.calls.length === 10,
+            "Ten storage items were not started"
+        );
         expect(progress.done).not.toHaveBeenCalled();
 
+        while (trackStorageFileModification.mock.calls.length < files.length) {
+            const started = trackStorageFileModification.mock.calls.length;
+            resolveModifications.shift()?.(false);
+            await waitForCondition(
+                () => trackStorageFileModification.mock.calls.length > started,
+                "A queued storage item was not started"
+            );
+        }
         for (const resolveModification of resolveModifications) resolveModification(false);
         await operation;
 
+        expect(trackStorageFileModification).toHaveBeenCalledTimes(101);
         expect(progress.done).toHaveBeenCalledTimes(1);
     });
 

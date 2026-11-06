@@ -64,16 +64,19 @@ import { ConfigSync } from "./CmdConfigSync";
 const term = "device";
 const prefix = `ix:${term}/`;
 const keyOf = (path: string) => prefix + path;
-type Row = { _id: string; path: string };
-const row = (name: string, path = name): Row => ({ _id: keyOf(name), path });
+type Row = { _id: string; path: string; deleted?: boolean };
+const row = (name: string, path = keyOf(name)): Row => ({ _id: keyOf(name), path });
 
-function setup(files: string[] = [], rows: Row[] = []) {
+function setup(files: string[] = [], rows: Row[] = [], usePluginSyncV2 = true) {
     const events: string[] = [];
     const findEntries = vi.fn(async function* () {
         yield* rows;
     });
     const scanInternalFiles = vi.fn(async () => files as FilePath[]);
     const storeCustomisationFileV2 = vi.fn(async (path: string, _term: string) => {
+        events.push(`store:${path}`);
+    });
+    const storeCustomizationFiles = vi.fn(async (path: string) => {
         events.push(`store:${path}`);
     });
     const deleteConfigOnDatabase = vi.fn(async (key: string) => {
@@ -84,7 +87,7 @@ function setup(files: string[] = [], rows: Row[] = []) {
     const configSync = Object.create(ConfigSync.prototype) as ConfigSync;
     Object.assign(configSync, {
         core: {
-            settings: { usePluginSyncV2: true },
+            settings: { usePluginSyncV2 },
             localDatabase: { findEntries },
             services: { setting: { getDeviceAndVaultName: () => term } },
         },
@@ -97,12 +100,20 @@ function setup(files: string[] = [], rows: Row[] = []) {
         updatePluginList,
         _log: log,
     });
+    if (!usePluginSyncV2) {
+        Object.assign(configSync, {
+            getPath: (entry: { path: string }) => entry.path,
+            storeCustomizationFiles,
+            filenameToUnifiedKey: (path: string) => keyOf(path),
+        });
+    }
     return {
         configSync,
         events,
         findEntries,
         scanInternalFiles,
         storeCustomisationFileV2,
+        storeCustomizationFiles,
         deleteConfigOnDatabase,
         updatePluginList,
         log,
@@ -242,6 +253,35 @@ describe("ConfigSync V2 scan behaviour", () => {
         expect(fixture.log).toHaveBeenCalledWith("scanAllConfigFiles - Error: bad", LOG_LEVEL_VERBOSE);
         expect(fixture.log).toHaveBeenCalledWith(error, LOG_LEVEL_VERBOSE);
         expect(fixture.updatePluginList).toHaveBeenCalledOnce();
+    });
+});
+
+describe("ConfigSync V1 scan behaviour", () => {
+    it("streams the legacy range through findEntries instead of a single allDocs request", async () => {
+        const fixture = setup(["matched"], [row("matched"), row("stale")], false);
+        await fixture.configSync.scanAllConfigFiles(false);
+
+        expect(fixture.findEntries).toHaveBeenCalledExactlyOnceWith("ix:", "ix:\u{10ffff}", { include_docs: true });
+        expect(fixture.storeCustomizationFiles).toHaveBeenCalledExactlyOnceWith("matched");
+        expect(fixture.deleteConfigOnDatabase).toHaveBeenCalledExactlyOnceWith(keyOf("stale"));
+        expect(fixture.events).toEqual([`store:matched`, `delete:${keyOf("stale")}`]);
+    });
+
+    it("keeps other terminals' keys and already deleted entries out of the delete candidates", async () => {
+        const fixture = setup(
+            ["matched"],
+            [
+                row("matched"),
+                { _id: "ix:other-device/PLUGIN_MAIN/other.md", path: "ix:other-device/PLUGIN_MAIN/other.md" },
+                { _id: keyOf("gone"), path: keyOf("gone"), deleted: true },
+            ],
+            false
+        );
+        await fixture.configSync.scanAllConfigFiles(false);
+
+        expect(fixture.deleteConfigOnDatabase).not.toHaveBeenCalledWith("ix:other-device/PLUGIN_MAIN/other.md");
+        expect(fixture.deleteConfigOnDatabase).not.toHaveBeenCalledWith(keyOf("gone"));
+        expect(fixture.events).toEqual([`store:matched`]);
     });
 });
 

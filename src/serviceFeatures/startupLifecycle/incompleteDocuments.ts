@@ -1,3 +1,4 @@
+import { delay } from "octagonal-wheels/promises";
 import {
     LOG_LEVEL_INFO,
     LOG_LEVEL_NOTICE,
@@ -50,6 +51,11 @@ type ErrorInfo = {
 
 const INCOMPLETE_DOCUMENT_NOTICE_GROUP = "startup-integrity-check";
 
+/** Yields to the event loop so queued rendering and input work can run. */
+async function yieldToEventLoop(): Promise<void> {
+    await delay(0);
+}
+
 /**
  * Scan database metadata against hidden storage and preserve the former
  * recoverable-file dialogue and repair rules.
@@ -72,7 +78,12 @@ export async function checkIncompleteDocuments(
 
     try {
         const errorFiles = [] as ErrorInfo[];
+        let processed = 0;
         for await (const metaDoc of dependencies.localDatabase.findAllNormalDocs({ conflicts: true })) {
+            processed++;
+            if (processed % 128 === 0) {
+                await yieldToEventLoop();
+            }
             const path = dependencies.getPath(metaDoc);
 
             if (!isValidPath(path)) {
@@ -82,6 +93,10 @@ export async function checkIncompleteDocuments(
                 continue;
             }
             if (!isMetaEntry(metaDoc)) {
+                continue;
+            }
+            // Deleted documents keep their metadata and are never reported; skip them before assembling the body.
+            if (metaDoc.deleted === true || metaDoc._deleted === true) {
                 continue;
             }
 
@@ -121,7 +136,7 @@ export async function checkIncompleteDocuments(
                 if (recordedSize === actualSize && sizeOnStorage === actualSize && !isConflicted) {
                     continue;
                 }
-                const contentMatched = await isDocContentSame(doc.data, storageFileContent);
+                const contentMatched = await isDocContentSame(docBlob, storageFileContent);
                 errorFiles.push({
                     path,
                     recordedSize,

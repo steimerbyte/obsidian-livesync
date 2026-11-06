@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import { delay } from "octagonal-wheels/promises";
 import type { LoadedEntry, MetaEntry, UXFileInfoStub } from "@vrtmrz/livesync-commonlib/compat/common/types";
 import { checkIncompleteDocuments, type IncompleteDocumentsDependencies } from "./incompleteDocuments";
 
+vi.mock("octagonal-wheels/promises", { spy: true });
 vi.mock("@/common/utils", () => ({
     isValidPath: () => true,
 }));
@@ -25,7 +27,7 @@ async function* failedDocumentScan(): AsyncGenerator<MetaEntry> {
 
 function documentFixture(
     path: string,
-    options: { recordedSize?: number; storageContent?: string; conflicts?: string[] } = {}
+    options: { recordedSize?: number; storageContent?: string; conflicts?: string[]; deleted?: boolean } = {}
 ): DocumentFixture {
     const storageContent = options.storageContent ?? "hello";
     const meta = {
@@ -39,6 +41,7 @@ function documentFixture(
         type: "plain",
         eden: {},
         ...(options.conflicts ? { _conflicts: options.conflicts } : {}),
+        ...(options.deleted ? { deleted: true } : {}),
     } as MetaEntry;
     const loaded = {
         ...meta,
@@ -114,6 +117,7 @@ function createDependencies(findAllNormalDocs: FindAllNormalDocs = noDocuments, 
     return {
         askSelectStringDialogue,
         dependencies,
+        getDBEntryFromMeta,
         getFileStub,
         noticeGroups,
         readHiddenFileBinary,
@@ -167,6 +171,30 @@ describe("checkIncompleteDocuments", () => {
         expect(fixture.readHiddenFileBinary).not.toHaveBeenCalled();
         expect(fixture.askSelectStringDialogue).not.toHaveBeenCalled();
         expect(fixture.dependencies.keyValueDB.set).toHaveBeenCalledWith("checkIncompleteDocs", true);
+    });
+
+    it("skips deleted documents without loading their content", async () => {
+        const deleted = documentFixture("deleted.md", { deleted: true, storageContent: "abc" });
+        const fixture = createDependencies(documentsFrom([deleted]), [deleted]);
+
+        await expect(checkIncompleteDocuments(fixture.dependencies)).resolves.toBe(true);
+
+        expect(fixture.getDBEntryFromMeta).not.toHaveBeenCalled();
+        expect(fixture.readHiddenFileBinary).not.toHaveBeenCalled();
+        expect(fixture.dependencies.keyValueDB.set).toHaveBeenCalledWith("checkIncompleteDocs", true);
+    });
+
+    it("yields to the event loop while scanning many documents", async () => {
+        const fixtures = Array.from({ length: 129 }, (_, index) =>
+            documentFixture(`note-${index}.md`, { storageContent: "abc" })
+        );
+        const fixture = createDependencies(documentsFrom(fixtures), fixtures);
+        vi.mocked(delay).mockClear();
+
+        await expect(checkIncompleteDocuments(fixture.dependencies)).resolves.toBe(true);
+
+        expect(vi.mocked(delay)).toHaveBeenCalledTimes(1);
+        expect(fixture.getDBEntryFromMeta).toHaveBeenCalledTimes(129);
     });
 
     it("does not mark a scan complete when storage changes during the size check", async () => {

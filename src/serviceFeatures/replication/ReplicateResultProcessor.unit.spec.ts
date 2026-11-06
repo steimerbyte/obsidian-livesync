@@ -284,7 +284,7 @@ describe("ReplicateResultProcessor", () => {
         processor.enqueueAll([document]);
 
         await vi.waitFor(() => expect(isValidPath).toHaveBeenCalledWith(path));
-        await vi.waitFor(() => expect(processor["_processingChanges"]).toHaveLength(0));
+        await vi.waitFor(() => expect(processor["_processingChanges"].size).toBe(0));
         expect(getDBEntryFromMeta).toHaveBeenCalledWith(expect.objectContaining({ path }), false, true);
         expect(processSynchroniseResult).not.toHaveBeenCalled();
     });
@@ -302,25 +302,55 @@ describe("ReplicateResultProcessor", () => {
                 // A queued duplicate is coalesced; a new notification for a document
                 // already being processed can occupy another application slot.
                 processor.enqueueAll([note("hot-queue")]);
-                await vi.waitFor(() => expect(processor["_processingChanges"]).toHaveLength(index));
+                await vi.waitFor(() => expect(processor["_processingChanges"].size).toBe(index));
             }
             processor.enqueueAll([note("unrelated-queue")]);
             await vi.waitFor(() => {
                 expect(processor["_semaphore"].waiting).toBeGreaterThan(0);
                 expect(processSynchroniseResult).toHaveBeenCalledTimes(1);
             });
-            expect(processor["_queuedChanges"].map((entry) => entry._id)).toEqual(["unrelated-queue"]);
+            expect(Array.from(processor["_queuedChanges"].keys())).toEqual(["unrelated-queue"]);
         } finally {
             hotGate.resolve(true);
             await vi.waitFor(() => {
-                expect(processor["_processingChanges"]).toHaveLength(0);
-                expect(processor["_queuedChanges"]).toHaveLength(0);
+                expect(processor["_processingChanges"].size).toBe(0);
+                expect(processor["_queuedChanges"].size).toBe(0);
             });
         }
         expect(processSynchroniseResult).toHaveBeenCalledTimes(11);
         expect(
             processSynchroniseResult.mock.calls.some(([entry]) => (entry as { _id: string })._id === "unrelated-queue")
         ).toBe(true);
+    });
+
+    it("coalesces a requeued document behind the documents already queued", () => {
+        const { processor } = setup({ applicationReady: false });
+        processor.enqueueAll([note("first"), note("second")]);
+        processor.enqueueAll([{ ...note("first"), _rev: "2-updated" }]);
+
+        expect(Array.from(processor["_queuedChanges"].keys())).toEqual(["second", "first"]);
+        expect(processor["_queuedChanges"].get("first")?._rev).toBe("2-updated");
+    });
+
+    it("persists queued documents as an array for recovery", () => {
+        const setSnapshot = vi.fn(async () => undefined);
+        const { processor } = setup({ applicationReady: false, setSnapshot });
+        processor.enqueueAll([note("held")]);
+
+        expect(setSnapshot).toHaveBeenCalledWith("replicationResultProcessorSnapshot", {
+            queued: [expect.objectContaining({ _id: "held" })],
+            processing: [],
+        });
+    });
+
+    it("does not persist an empty recovery snapshot on a throttled trigger", () => {
+        const setSnapshot = vi.fn(async () => undefined);
+        const { processor } = setup({ applicationReady: false, setSnapshot });
+        processor["_triggerTakeSnapshot"]();
+        expect(setSnapshot).not.toHaveBeenCalled();
+
+        processor.enqueueAll([note("queued")]);
+        expect(setSnapshot).toHaveBeenCalledOnce();
     });
 
     it("suspends result application while the application is not ready", () => {
@@ -335,13 +365,13 @@ describe("ReplicateResultProcessor", () => {
         processor.enqueueAll([note("held")]);
         await new Promise((resolve) => setTimeout(resolve, 0));
         expect(processSynchroniseResult).not.toHaveBeenCalled();
-        expect(processor["_queuedChanges"]).toHaveLength(1);
+        expect(processor["_queuedChanges"].size).toBe(1);
 
         isReady.mockReturnValue(true);
         processor.continueHeldDocuments();
 
         await vi.waitFor(() => expect(processSynchroniseResult).toHaveBeenCalledOnce());
-        expect(processor["_queuedChanges"]).toHaveLength(0);
+        expect(processor["_queuedChanges"].size).toBe(0);
     });
 
     it("keeps an explicit suspension when the application becomes ready", async () => {
@@ -353,7 +383,7 @@ describe("ReplicateResultProcessor", () => {
         processor.continueHeldDocuments();
         await new Promise((resolve) => setTimeout(resolve, 0));
         expect(processSynchroniseResult).not.toHaveBeenCalled();
-        expect(processor["_queuedChanges"]).toHaveLength(1);
+        expect(processor["_queuedChanges"].size).toBe(1);
 
         processor.resume();
         await vi.waitFor(() => expect(processSynchroniseResult).toHaveBeenCalledOnce());
@@ -392,8 +422,8 @@ describe("ReplicateResultProcessor", () => {
         processor.enqueueAll([tooRecent]);
 
         await vi.waitFor(() => {
-            expect(processor["_queuedChanges"]).toHaveLength(0);
-            expect(processor["_processingChanges"]).toHaveLength(0);
+            expect(processor["_queuedChanges"].size).toBe(0);
+            expect(processor["_processingChanges"].size).toBe(0);
         });
         expect(processSynchroniseResult).not.toHaveBeenCalled();
     });

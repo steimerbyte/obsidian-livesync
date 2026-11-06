@@ -7,7 +7,13 @@ vi.mock("octagonal-wheels/concurrency/lock_v2", () => ({
     withLock: vi.fn((_key: string, task: () => unknown) => task()),
 }));
 vi.mock("octagonal-wheels/collection", () => ({
-    arrayToChunkedArray: vi.fn((values: unknown[]) => [values]),
+    arrayToChunkedArray: vi.fn(<T>(values: T[], chunkLength: number) => {
+        const batches: T[][] = [];
+        for (let index = 0; index < values.length; index += chunkLength) {
+            batches.push(values.slice(index, index + chunkLength));
+        }
+        return batches;
+    }),
 }));
 vi.mock("@vrtmrz/livesync-commonlib/compat/common/utils", async (importOriginal) => {
     const actual = await importOriginal<typeof import("@vrtmrz/livesync-commonlib/compat/common/utils")>();
@@ -39,7 +45,9 @@ import {
     REMOTE_COUCHDB,
     REMOTE_MINIO,
     REMOTE_P2P,
+    type DocumentID,
 } from "@vrtmrz/livesync-commonlib/compat/common/types";
+import { withLock } from "octagonal-wheels/concurrency/lock_v2";
 import { LocalDatabaseMaintenance } from "./CmdLocalDatabaseMainte";
 import { ensureLocalDatabaseMaintenancePrerequisites } from "./maintenancePrerequisites";
 import { eventHub, EVENT_REQUEST_PERFORM_GC_V3 } from "@/common/events";
@@ -221,6 +229,83 @@ describe("LocalDatabaseMaintenance prerequisites", () => {
     });
 });
 
+describe("LocalDatabaseMaintenance bounded database access", () => {
+    it("scans deleted files through bounded metadata ranges", async () => {
+        const maintenance = Object.create(LocalDatabaseMaintenance.prototype) as LocalDatabaseMaintenance;
+        const findEntries = vi.fn(async function* (startKey: string) {
+            if (startKey === "") {
+                yield { _id: "deleted.md", _rev: "2-deleted", type: "newnote", deleted: true };
+                yield { _id: "live.md", _rev: "1-live", type: "plain" };
+            }
+        });
+        const allDocs = vi.fn(async () => ({ rows: [] }));
+        const askSelectStringDialogue = vi.fn().mockResolvedValue("Cancel");
+        Object.assign(maintenance, {
+            core: {
+                confirm: {
+                    askSelectStringDialogue,
+                },
+            },
+            localDatabase: {
+                findEntries,
+                localDatabase: { allDocs },
+            },
+            _progress: vi.fn(() => ({ log: vi.fn(), done: vi.fn() })),
+        });
+        vi.spyOn(maintenance, "ensureAvailable").mockResolvedValue(true);
+
+        await maintenance.commitFileDeletion();
+
+        expect(findEntries).toHaveBeenCalledWith("", "h:", { include_docs: true });
+        expect(findEntries).toHaveBeenCalledWith("h:\u{10ffff}", "", { include_docs: true });
+        expect(allDocs).not.toHaveBeenCalled();
+        const message = vi.mocked(askSelectStringDialogue).mock.calls[0]?.[0] as string;
+        expect(message).toContain("- Deleted files: 1");
+    });
+
+    it("reads and deletes unused chunks in bounded batches", async () => {
+        const maintenance = Object.create(LocalDatabaseMaintenance.prototype) as LocalDatabaseMaintenance;
+        const unusedIds = Array.from({ length: 250 }, (_, index) => `h:unused-${index}` as DocumentID);
+        const allDocs = vi.fn(async ({ keys }: { keys: DocumentID[] }) => ({
+            rows: keys.map((key) => ({
+                id: key,
+                key,
+                value: { rev: "1-unused" },
+                doc: { _id: key, _rev: "1-unused", type: "leaf", data: "unused" },
+            })),
+        }));
+        const bulkDocs = vi.fn(async (docs: Array<{ _id: DocumentID }>) =>
+            docs.map(({ _id }) => ({ ok: true, id: _id }))
+        );
+        const set = vi.fn(async () => undefined);
+        Object.assign(maintenance, {
+            core: {
+                confirm: {
+                    askSelectStringDialogue: vi.fn(async () => "Yes, delete chunks"),
+                },
+                kvDB: { set },
+            },
+            localDatabase: {
+                localDatabase: { allDocs, bulkDocs },
+            },
+            _log: vi.fn(),
+        });
+        vi.spyOn(maintenance, "ensureAvailable").mockResolvedValue(true);
+        vi.spyOn(maintenance, "trackChanges").mockResolvedValue(undefined);
+        vi.spyOn(maintenance, "scanUnusedChunks").mockResolvedValue({
+            chunkSet: new Set(unusedIds),
+            chunkUsageMap: new Map(),
+            unusedSet: new Set(unusedIds),
+        });
+
+        await maintenance.performGC();
+
+        expect(allDocs.mock.calls.map(([options]) => options.keys.length)).toEqual([100, 100, 50]);
+        expect(bulkDocs.mock.calls.map(([docs]) => docs.length)).toEqual([100, 100, 50]);
+        expect(set).toHaveBeenLastCalledWith("chunk-set", new Set());
+    });
+});
+
 describe("LocalDatabaseMaintenance Garbage Collection V3", () => {
     it("does not report remote compaction as successful after its completion wait times out", async () => {
         const maintenance = Object.create(LocalDatabaseMaintenance.prototype) as LocalDatabaseMaintenance;
@@ -365,6 +450,7 @@ describe("LocalDatabaseMaintenance Garbage Collection V3", () => {
                     deletedChunks.push(...docs);
                     return docs.map(({ _id }) => ({ ok: true, id: _id, rev: "2-deleted" }));
                 }),
+                compact: vi.fn(async () => ({ ok: true })),
             },
             findEntryNames,
             getRaw,
@@ -406,6 +492,7 @@ describe("LocalDatabaseMaintenance Garbage Collection V3", () => {
             },
             localDatabase,
             _notice: vi.fn(),
+            _log: vi.fn(),
         });
         vi.spyOn(maintenance, "ensureAvailable").mockResolvedValue(true);
         vi.spyOn(maintenance, "compactDatabase").mockResolvedValue(undefined);
@@ -413,6 +500,7 @@ describe("LocalDatabaseMaintenance Garbage Collection V3", () => {
 
         await maintenance.gcv3();
 
+        expect(localDatabase.localDatabase.compact).toHaveBeenCalledOnce();
         expect(allChunks).toHaveBeenCalledOnce();
         expect(findEntryNames).not.toHaveBeenCalled();
         expect(getRaw).not.toHaveBeenCalled();
@@ -425,5 +513,104 @@ describe("LocalDatabaseMaintenance Garbage Collection V3", () => {
         ]);
         expect(pushModes).toEqual(["sync", "pushOnly"]);
         expect(maintenance.compactDatabase).toHaveBeenCalledOnce();
+    });
+
+    it("runs Garbage Collection V3 inside its dedicated lock", async () => {
+        const maintenance = Object.create(LocalDatabaseMaintenance.prototype) as LocalDatabaseMaintenance;
+        let insideLock = false;
+        let ensureAvailableRanInsideLock = false;
+        vi.mocked(withLock).mockImplementationOnce(async (_key, task) => {
+            insideLock = true;
+            try {
+                return await task();
+            } finally {
+                insideLock = false;
+            }
+        });
+        const replicator = {
+            openOneShotReplication: vi.fn(async () => true),
+            getConnectedDeviceList: vi.fn(async () => ({
+                accepted_nodes: [],
+                node_info: {},
+            })),
+        };
+        Object.assign(maintenance, {
+            core: {
+                settings: {
+                    ...DEFAULT_SETTINGS,
+                    remoteType: REMOTE_COUCHDB,
+                },
+                replicator,
+            },
+            _notice: vi.fn(),
+        });
+        vi.spyOn(maintenance, "ensureAvailable").mockImplementation(async () => {
+            ensureAvailableRanInsideLock = insideLock;
+            return false;
+        });
+
+        await maintenance.gcv3();
+
+        expect(vi.mocked(withLock)).toHaveBeenCalledWith("gc-v3", expect.any(Function));
+        expect(maintenance.ensureAvailable).toHaveBeenCalledOnce();
+        expect(ensureAvailableRanInsideLock).toBe(true);
+    });
+
+    it("deletes unreachable chunks in batches of at most 100", async () => {
+        const maintenance = Object.create(LocalDatabaseMaintenance.prototype) as LocalDatabaseMaintenance;
+        const existing = new Map(
+            Array.from({ length: 250 }, (_, index) => {
+                const id = `h:unused-${index}` as DocumentID;
+                return [id, { _id: id, _rev: `1-unused-${index}`, type: "leaf", data: "unused" }] as const;
+            })
+        );
+        const allChunks = vi.fn(async () => ({
+            used: new Set<DocumentID>(),
+            existing,
+        }));
+        const bulkDocs = vi.fn(async (docs: Array<{ _id: DocumentID }>) =>
+            docs.map(({ _id }) => ({ ok: true, id: _id }))
+        );
+        const notice = vi.fn();
+        const replicator = {
+            openOneShotReplication: vi.fn(async () => true),
+            getConnectedDeviceList: vi.fn(async () => ({
+                accepted_nodes: ["device-a"],
+                node_info: {
+                    "device-a": {
+                        progress: "10-local",
+                        device_name: "Device A",
+                        app_version: "1.12.7",
+                        plugin_version: "1.0.0-beta.0",
+                    },
+                },
+            })),
+        };
+        Object.assign(maintenance, {
+            core: {
+                settings: {
+                    ...DEFAULT_SETTINGS,
+                    remoteType: REMOTE_COUCHDB,
+                },
+                replicator,
+                confirm: {
+                    askSelectStringDialogue: vi.fn(async () => "Proceed Garbage Collection"),
+                },
+            },
+            localDatabase: {
+                allChunks,
+                localDatabase: { bulkDocs, compact: vi.fn(async () => ({ ok: true })) },
+            },
+            _notice: notice,
+            _log: vi.fn(),
+        });
+        vi.spyOn(maintenance, "ensureAvailable").mockResolvedValue(true);
+        vi.spyOn(maintenance, "compactDatabase").mockResolvedValue(undefined);
+        vi.spyOn(maintenance, "clearHash").mockImplementation(() => undefined);
+
+        await maintenance.gcv3();
+
+        expect(bulkDocs.mock.calls.map(([docs]) => docs.length)).toEqual([100, 100, 50]);
+        expect(notice).toHaveBeenCalledWith(expect.stringContaining("Deleted chunks: 250 / 250"));
     });
 });

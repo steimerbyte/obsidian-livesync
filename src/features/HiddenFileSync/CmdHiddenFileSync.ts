@@ -97,7 +97,11 @@ export class HiddenFileSync extends LiveSyncCommands {
 
     periodicInternalFileScanProcessor: PeriodicProcessor = new PeriodicProcessor(
         this.core,
-        async () => this.isThisModuleEnabled() && this._isDatabaseReady() && (await this.scanAllStorageChanges(false))
+        async () =>
+            !this._isMainSuspended() &&
+            this.isThisModuleEnabled() &&
+            this._isDatabaseReady() &&
+            (await this.scanAllStorageChanges(false))
     );
 
     get kvDB() {
@@ -602,9 +606,15 @@ export class HiddenFileSync extends LiveSyncCommands {
                 `Known/Exist ${knownNames.length}/${existNames.length}, Totally ${files.size} files.`,
                 LOG_LEVEL_VERBOSE
             );
-            const taskNameAndMeta = [...files].map(
-                async (e) => [e, await this.core.storageAccess.statHidden(e)] as const
-            );
+            const statSemaphore = Semaphore(10);
+            const taskNameAndMeta = [...files].map(async (e) => {
+                const rel = await statSemaphore.acquire();
+                try {
+                    return [e, await this.core.storageAccess.statHidden(e)] as const;
+                } finally {
+                    rel();
+                }
+            });
             const nameAndMeta = await Promise.all(taskNameAndMeta);
             const processFiles = nameAndMeta
                 .filter(([path, stat]) => {
@@ -1194,14 +1204,16 @@ Offline Changed files: ${processFiles.length}`;
             );
             const currentDatabaseFileNames = [...Object.keys(allDatabaseMap)] as FilePath[];
             const untrackedLocal = currentStorageFiles.filter((e) => !this._fileInfoLastProcessed.has(e));
-            const untrackedDatabase = currentDatabaseFileNames.filter((e) => !this._databaseInfoLastProcessed.has(e));
-            const bothUntracked = untrackedLocal.filter((e) => untrackedDatabase.indexOf(e) !== -1);
+            const untrackedDatabase = new Set(
+                currentDatabaseFileNames.filter((e) => !this._databaseInfoLastProcessed.has(e))
+            );
+            const bothUntracked = untrackedLocal.filter((e) => untrackedDatabase.has(e));
             p.log("Applying untracked changes...");
             const stat = `Tracking statics:
 Local files: ${currentStorageFiles.length}
 Database files: ${currentDatabaseFileNames.length}
 Untracked local files: ${untrackedLocal.length}
-Untracked database files: ${untrackedDatabase.length}
+Untracked database files: ${untrackedDatabase.size}
 Common untracked files: ${bothUntracked.length}`;
             p.once(stat);
             const semaphores = Semaphore(10);
@@ -1512,16 +1524,28 @@ Offline Changed files: ${files.length}`;
     }
 
     async getAllDatabaseFiles() {
-        const allFiles = (
-            await this.localDatabase.allDocsRaw({ startkey: ICHeader, endkey: ICHeaderEnd, include_docs: true })
-        ).rows
-            .filter((e) => isInternalMetadata(e.id as DocumentID))
-            .map((e) => e.doc) as MetaEntry[];
+        // The i: range can hold metadata for the whole vault, so read it in pages instead of one response.
         const files = [] as MetaEntry[];
-        for (const file of allFiles) {
-            if (await this.isTargetFile(stripAllPrefixes(this.getPath(file)))) {
-                files.push(file);
+        let startkey: string = ICHeader;
+        for (let page = 0; ; page++) {
+            const rows = (
+                await this.localDatabase.allDocsRaw({
+                    startkey,
+                    endkey: ICHeaderEnd,
+                    include_docs: true,
+                    limit: 1000,
+                    skip: page === 0 ? 0 : 1,
+                })
+            ).rows;
+            for (const row of rows) {
+                if (!isInternalMetadata(row.id as DocumentID)) continue;
+                const file = row.doc as MetaEntry;
+                if (await this.isTargetFile(stripAllPrefixes(this.getPath(file)))) {
+                    files.push(file);
+                }
             }
+            if (rows.length < 1000) break;
+            startkey = rows[rows.length - 1].id;
         }
         return files;
     }

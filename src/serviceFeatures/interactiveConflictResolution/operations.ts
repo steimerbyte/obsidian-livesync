@@ -137,6 +137,8 @@ export function createInteractiveConflictResolutionOperations(
 
     const refreshConflictState = async (filename: FilePathWithPrefix): Promise<void> => {
         if (dependencies.signal.aborted) return;
+        // Only the active file and postponed conflicts are displayed; other paths have no consumer.
+        if (dependencies.vault.getActiveFilePath() !== filename && !postponedConflictEpisodes.has(filename)) return;
         const versionCount = await getConflictVersionCount(filename);
         if (dependencies.signal.aborted) return;
         if (versionCount === 0) {

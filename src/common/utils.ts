@@ -26,7 +26,7 @@ import {
 } from "@vrtmrz/livesync-commonlib/compat/common/types";
 export { ICHeader, ICXHeader } from "./types.ts";
 import { writeString } from "@vrtmrz/livesync-commonlib/compat/string_and_binary/convert";
-import { sameChangePairs } from "./stores.ts";
+import { sameChangePairs, setSameChangePair } from "./stores.ts";
 
 import { scheduleTask } from "octagonal-wheels/concurrency/task";
 import { AuthorizationHeaderGenerator } from "@vrtmrz/livesync-commonlib/compat/replication/httplib";
@@ -223,9 +223,9 @@ export function markChangesAreSame(file: AnyEntry | string | UXFileInfoStub, mti
     const key = getKey(file);
     const pairs = sameChangePairs.get(key, []) || [];
     if (pairs.some((e) => e == mtime1 || e == mtime2)) {
-        sameChangePairs.set(key, [...new Set([...pairs, mtime1, mtime2])]);
+        setSameChangePair(key, [...new Set([...pairs, mtime1, mtime2])]);
     } else {
-        sameChangePairs.set(key, [mtime1, mtime2]);
+        setSameChangePair(key, [mtime1, mtime2]);
     }
 }
 

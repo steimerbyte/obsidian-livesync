@@ -100,6 +100,7 @@ export class DocumentHistoryModal extends Modal {
     searchResultIndicator!: HTMLSpanElement;
     searchProgressIndicator!: HTMLSpanElement;
     searchTimeout: number | null = null;
+    revLoadTimeout: number | null = null;
 
     constructor(
         app: App,
@@ -164,6 +165,21 @@ export class DocumentHistoryModal extends Modal {
         const rev = this.revs_info[index];
         await this.showExactRev(rev.rev);
         this.updateRevisionNavUI();
+    }
+
+    // Dragging the slider fires input per pixel; coalesce into one trailing load.
+    scheduleLoadRevs() {
+        this.cancelScheduledLoadRevs();
+        this.revLoadTimeout = compatGlobal.setTimeout(() => {
+            this.revLoadTimeout = null;
+            void scheduleOnceIfDuplicated("loadRevs", () => this.loadRevs());
+        }, 275);
+    }
+    cancelScheduledLoadRevs() {
+        if (this.revLoadTimeout) {
+            compatGlobal.clearTimeout(this.revLoadTimeout);
+            this.revLoadTimeout = null;
+        }
     }
 
     navigateVersion(direction: "older" | "newer") {
@@ -572,12 +588,13 @@ export class DocumentHistoryModal extends Modal {
         revNavRow.createEl("input", { type: "range" }, (e) => {
             this.range = e;
             e.addEventListener("change", () => {
+                this.cancelScheduledLoadRevs();
                 this.updateRevisionNavUI();
                 void scheduleOnceIfDuplicated("loadRevs", () => this.loadRevs());
             });
             e.addEventListener("input", () => {
                 this.updateRevisionNavUI();
-                void scheduleOnceIfDuplicated("loadRevs", () => this.loadRevs());
+                this.scheduleLoadRevs();
             });
         });
 
@@ -613,7 +630,7 @@ export class DocumentHistoryModal extends Modal {
                         this.showDiff
                     );
                     this.updateDiffNavVisibility();
-                    void scheduleOnceIfDuplicated("loadRevs", () => this.loadRevs());
+                    this.scheduleLoadRevs();
                 });
             });
             label.appendText("Highlight diff");
@@ -627,7 +644,7 @@ export class DocumentHistoryModal extends Modal {
             checkbox.addEventListener("input", (evt: Event) => {
                 this.diffOnly = checkbox.checked;
                 saveDocumentHistoryPreference(this.app, DOCUMENT_HISTORY_PREFERENCE_KEYS.diffOnly, this.diffOnly);
-                void scheduleOnceIfDuplicated("loadRevs", () => this.loadRevs());
+                this.scheduleLoadRevs();
             });
         });
         diffOnlyLabel.appendText("Diff only");
@@ -788,6 +805,7 @@ export class DocumentHistoryModal extends Modal {
         });
     }
     override onClose() {
+        this.cancelScheduledLoadRevs();
         const { contentEl } = this;
         contentEl.empty();
         this.BlobURLs.forEach((value) => {
