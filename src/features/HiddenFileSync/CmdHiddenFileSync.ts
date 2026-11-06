@@ -655,7 +655,7 @@ Offline Changed files: ${processFiles.length}`;
         }
         try {
             return await this.serializedForEvent(path, async () => {
-                let stat = await this.core.storageAccess.statHidden(path);
+                const stat = await this.core.storageAccess.statHidden(path);
                 // sometimes folder is coming.
                 if (stat != null && stat.type != "file") {
                     return false;
@@ -670,16 +670,9 @@ Offline Changed files: ${processFiles.length}`;
                     this._log(`${path} Already processed.`, LOG_LEVEL_DEBUG);
                     return true;
                 }
-                // We should cache the file
-                const cache = await this.loadFileWithInfo(path);
-                const cacheMTime = getComparingMTime(cache.stat);
-                const statMtime = getComparingMTime(stat);
-                if (cacheMTime != statMtime) {
-                    this._log(`Hidden file:${path} is changed.`, LOG_LEVEL_VERBOSE);
-                    stat = cache.stat;
-                }
                 const lastIsNotFound = !lastKey || lastKey.endsWith("-0-0");
-                const nowIsNotFound = cache.deleted;
+                // The stat is the only source of truth now; reading the body here would defeat the size guard below.
+                const nowIsNotFound = stat == null;
                 const type = lastIsNotFound && nowIsNotFound ? "invalid" : nowIsNotFound ? "delete" : "modified";
 
                 if (type == "invalid") {
@@ -714,7 +707,19 @@ Offline Changed files: ${processFiles.length}`;
                     return result;
                 } else if (type == "modified") {
                     this._log(`Modification detected:${path}`, LOG_LEVEL_VERBOSE);
-                    const result = await this.storeInternalFileToDatabase(cache, forceWrite);
+                    if (stat != null && this.isTooLargeToStore(stat.size)) {
+                        this._log(
+                            `Hidden file:${path} is too large to store. Skipped reading it.`,
+                            LOG_LEVEL_NOTICE
+                        );
+                        return undefined;
+                    }
+                    const fileInfo = await this.loadFileWithInfo(path);
+                    if (fileInfo.deleted) {
+                        // The file disappeared between the stat and the read; handle it as a deletion.
+                        return await this.deleteInternalFileOnDatabase(path, forceWrite);
+                    }
+                    const result = await this.storeInternalFileToDatabase(fileInfo, forceWrite);
                     const resultText = result === undefined ? "Nothing changed" : result ? "Updated" : "Failed";
                     this._log(`${resultText}: ${path} ${resultText}`, LOG_LEVEL_VERBOSE);
                     return result;
@@ -739,6 +744,14 @@ Offline Changed files: ${processFiles.length}`;
                 return true;
             }
 
+            if (stat == null) {
+                await this.deleteInternalFileOnDatabaseStrict(path);
+                return true;
+            }
+            if (this.isTooLargeToStore(stat.size)) {
+                this._log(`Hidden file:${path} is too large to store. Skipped reading it.`, LOG_LEVEL_NOTICE);
+                return true;
+            }
             const fileInfo = await this.loadFileWithInfo(path);
             if (fileInfo.deleted) {
                 await this.deleteInternalFileOnDatabaseStrict(path);
@@ -1163,6 +1176,7 @@ Offline Changed files: ${processFiles.length}`;
         const logLevel = getLogLevel(showNotice);
         const p = this._progress(`[⚙ DB -> Storage ]\n`, logLevel);
         await performBatchWithProgress(processFiles, 100, {
+            priority: "user",
             processItem: async (file) => {
                 const path = stripAllPrefixes(this.getPath(file));
                 if (!(await this.isTargetFile(path))) {
@@ -1687,6 +1701,11 @@ Offline Changed files: ${files.length}`;
         }
     }
 
+    private isTooLargeToStore(size: number): boolean {
+        // Optional call: lightweight test doubles provide only part of the vault service.
+        return this.services.vault.isFileSizeTooLarge?.(size) ?? false;
+    }
+
     private async getLiveInternalRevision(
         prefixedFileName: FilePathWithPrefix,
         revision: string
@@ -1723,6 +1742,11 @@ Offline Changed files: ${files.length}`;
         const storeFilePath = stripAllPrefixes(file.path);
         const storageFilePath = file.path;
         if (await this.services.vault.isIgnoredByIgnoreFile(storageFilePath)) {
+            return undefined;
+        }
+        const knownStat = "stat" in file ? file.stat : await this.core.storageAccess.statHidden(storageFilePath);
+        if (knownStat != null && this.isTooLargeToStore(knownStat.size)) {
+            this._log(`STORAGE --> DB:${storageFilePath}: (hidden) Too large to store. Skipped.`, LOG_LEVEL_NOTICE);
             return undefined;
         }
         const prefixedFileName = addPrefix(storeFilePath, ICHeader);
@@ -1784,6 +1808,11 @@ Offline Changed files: ${files.length}`;
         const storeFilePath = stripAllPrefixes(file.path);
         const storageFilePath = file.path;
         if (await this.services.vault.isIgnoredByIgnoreFile(storageFilePath)) {
+            return false;
+        }
+        const knownStat = "stat" in file ? file.stat : await this.core.storageAccess.statHidden(storageFilePath);
+        if (knownStat != null && this.isTooLargeToStore(knownStat.size)) {
+            this._log(`STORAGE --> DB:${storageFilePath}: (hidden) Too large to store. Skipped.`, LOG_LEVEL_NOTICE);
             return false;
         }
         const prefixedFileName = addPrefix(storeFilePath, ICHeader);
@@ -2178,11 +2207,17 @@ Offline Changed files: ${files.length}`;
 
     async scanInternalFiles(): Promise<InternalFileInfo[]> {
         const fileNames = await this.scanInternalFileNames();
+        const statSemaphore = Semaphore(8);
         const files = fileNames.map(async (e) => {
-            return {
-                path: e,
-                stat: await this.core.storageAccess.statHidden(e), // this.plugin.vaultAccess.adapterStat(e)
-            };
+            const rel = await statSemaphore.acquire();
+            try {
+                return {
+                    path: e,
+                    stat: await this.core.storageAccess.statHidden(e), // this.plugin.vaultAccess.adapterStat(e)
+                };
+            } finally {
+                rel();
+            }
         });
         const result: InternalFileInfo[] = [];
         for (const f of files) {

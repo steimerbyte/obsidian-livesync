@@ -13,7 +13,7 @@ export function paneHelp(this: ObsidianLiveSyncSettingTab, paneEl: HTMLElement, 
         lifetimeComponent.register(() => {
             pageDisposed = true;
         });
-        const repo = "vrtmrz/obsidian-livesync";
+        const repo = "steimerbyte/obsidian-livesync";
         const topPath = $msg("obsidianLiveSyncSettingTab.linkTroubleshooting");
         const rawRepoURI = `https://raw.githubusercontent.com/${repo}/main`;
         this.createEl(panelEl, "div", "", (el) => {

@@ -93,6 +93,7 @@ function createDependencies(findAllNormalDocs: FindAllNormalDocs = noDocuments, 
     const getFileStub = vi.fn(async (path: string) => getFixture(path)?.stub ?? null);
     const storeFileToDB = vi.fn(async () => true);
     const askSelectStringDialogue = vi.fn();
+    const isFileSizeTooLarge = vi.fn(() => false);
     const dependencies = {
         localDatabase: {
             findAllNormalDocs,
@@ -105,6 +106,7 @@ function createDependencies(findAllNormalDocs: FindAllNormalDocs = noDocuments, 
             statHidden: vi.fn(async (path: string) => getFixture(path)?.stub.stat ?? null),
             getFileStub,
         },
+        isFileSizeTooLarge,
         fileHandler: { storeFileToDB },
         keyValueDB: {
             get: vi.fn(async () => false),
@@ -119,6 +121,7 @@ function createDependencies(findAllNormalDocs: FindAllNormalDocs = noDocuments, 
         dependencies,
         getDBEntryFromMeta,
         getFileStub,
+        isFileSizeTooLarge,
         noticeGroups,
         readHiddenFileBinary,
         storeFileToDB,
@@ -170,6 +173,19 @@ describe("checkIncompleteDocuments", () => {
 
         expect(fixture.readHiddenFileBinary).not.toHaveBeenCalled();
         expect(fixture.askSelectStringDialogue).not.toHaveBeenCalled();
+        expect(fixture.dependencies.keyValueDB.set).toHaveBeenCalledWith("checkIncompleteDocs", true);
+    });
+
+    it("skips a file that is too large to read without reporting it as incomplete", async () => {
+        const oversized = documentFixture("oversized.md", { recordedSize: 3, storageContent: "abcde" });
+        const fixture = createDependencies(documentsFrom([oversized]), [oversized]);
+        fixture.isFileSizeTooLarge.mockReturnValue(true);
+
+        await expect(checkIncompleteDocuments(fixture.dependencies)).resolves.toBe(true);
+
+        expect(fixture.readHiddenFileBinary).not.toHaveBeenCalled();
+        expect(fixture.askSelectStringDialogue).not.toHaveBeenCalled();
+        expect(fixture.storeFileToDB).not.toHaveBeenCalled();
         expect(fixture.dependencies.keyValueDB.set).toHaveBeenCalledWith("checkIncompleteDocs", true);
     });
 

@@ -54,6 +54,7 @@ export function useReplicationFeature<TContext extends ServiceContext, TCommands
                     ? await localApplicationActivityOwner.runBoundedLocalApplicationActivity(task, options)
                     : await task(),
             services: {
+                API: services.API,
                 appLifecycle: services.appLifecycle,
                 database: services.database,
                 path: services.path,

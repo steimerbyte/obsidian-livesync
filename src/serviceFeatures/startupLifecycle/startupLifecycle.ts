@@ -47,6 +47,7 @@ function createDefaultOperations(
                     getPath: (entry) => services.path.getPath(entry),
                     isTargetFile: (path) => services.vault.isTargetFile(path),
                     storageAccess: host.serviceModules.storageAccess,
+                    isFileSizeTooLarge: (size) => services.vault.isFileSizeTooLarge(size),
                     fileHandler: host.serviceModules.fileHandler,
                     keyValueDB: services.keyValueDB.kvDB,
                     noticeGroups: services.context.noticeGroups,

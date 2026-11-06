@@ -217,11 +217,11 @@ describe("paneSelector multiple-pattern controls", () => {
 
         await defaultButton!.handler!();
         expect(tab.editingSettings.syncInternalFilesIgnorePatterns).toBe(
-            "existing,\\/node_modules\\/, \\/\\.git\\/, ^\\.git\\/, \\/obsidian-livesync\\/"
+            "existing,\\/node_modules\\/, \\/\\.git\\/, ^\\.git\\/, \\/livesync-efficient\\/"
         );
         await crossPlatformButton!.handler!();
         expect(tab.editingSettings.syncInternalFilesIgnorePatterns).toBe(
-            "existing,\\/node_modules\\/, \\/\\.git\\/, ^\\.git\\/, \\/obsidian-livesync\\/,\\/workspace$ ,\\/workspace.json$,\\/workspace-mobile.json$"
+            "existing,\\/node_modules\\/, \\/\\.git\\/, ^\\.git\\/, \\/livesync-efficient\\/,\\/workspace$ ,\\/workspace.json$,\\/workspace-mobile.json$"
         );
         expect(tab.saveAllDirtySettings).toHaveBeenCalledTimes(2);
         expect(tab.requestPageRefresh).toHaveBeenCalledTimes(2);

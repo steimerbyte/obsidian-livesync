@@ -33,6 +33,7 @@ export interface IncompleteDocumentsDependencies {
     readonly getPath: StartupPathReader;
     readonly isTargetFile: (path: string) => Promise<boolean>;
     readonly storageAccess: Pick<StorageAccess, "readHiddenFileBinary" | "statHidden" | "getFileStub">;
+    readonly isFileSizeTooLarge: (size: number) => boolean;
     readonly fileHandler: Pick<IFileHandler, "storeFileToDB">;
     readonly keyValueDB: Pick<KeyValueDatabase, "get" | "set">;
     readonly noticeGroups: NoticeGroups;
@@ -123,6 +124,11 @@ export async function checkIncompleteDocuments(
                 sizeOnStorage !== recordedSize ||
                 isConflicted
             ) {
+                // Oversized bodies are left alone: reading them is the very cost this check avoids.
+                if (dependencies.isFileSizeTooLarge(storageStat.size)) {
+                    Logger(`Skipped checking ${path}: the file is too large to read.`, LOG_LEVEL_NOTICE);
+                    continue;
+                }
                 let storageFileContent;
                 try {
                     storageFileContent = await dependencies.storageAccess.readHiddenFileBinary(path);
@@ -219,6 +225,10 @@ export async function checkIncompleteDocuments(
                 const stubFile = await dependencies.storageAccess.getFileStub(file.path);
                 if (stubFile == null) {
                     Logger(`Could not find stub file for ${file.path}`, LOG_LEVEL_NOTICE);
+                    continue;
+                }
+                if (dependencies.isFileSizeTooLarge(stubFile.stat.size)) {
+                    Logger(`Skipped restoring ${file.path}: the file is too large to store.`, LOG_LEVEL_NOTICE);
                     continue;
                 }
 

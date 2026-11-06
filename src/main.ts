@@ -1,6 +1,13 @@
 import { useP2PSettingsPreparation } from "@/serviceFeatures/useP2PSettingsPreparation";
-import { LOG_LEVEL_URGENT } from "octagonal-wheels/common/logger";
-import { getLanguage, Notice, Plugin, type App, type PluginManifest } from "./deps";
+import { LOG_LEVEL_URGENT, LOG_LEVEL_VERBOSE } from "octagonal-wheels/common/logger";
+import { getLanguage, Notice, Platform, Plugin, type App, type PluginManifest } from "./deps";
+import {
+    configureGovernor,
+    disposeGovernor,
+    getGovernorConfig,
+    getGovernorSnapshot,
+    setGovernorConfig,
+} from "@/common/resourceGovernor";
 import { setGetLanguage } from "@vrtmrz/livesync-commonlib/compat/common/coreEnvFunctions";
 setGetLanguage(getLanguage);
 import { LiveSyncCommands } from "./features/LiveSyncCommands.ts";
@@ -58,6 +65,25 @@ import { useStartupLifecycleFeature } from "./serviceFeatures/startupLifecycle";
 import { useJoinedDevicesFeature } from "./serviceFeatures/useJoinedDevices";
 import { useDatabaseDiagnosticsFeature } from "./serviceFeatures/useDatabaseDiagnostics";
 export type LiveSyncCore = LiveSyncBaseCore<ObsidianServiceContext, LiveSyncCommands>;
+
+/**
+ * Renders the governor's own view of itself. The level and the effective limits together are the
+ * active profile, since the governor has no separate profile setting.
+ */
+function describeGovernorStatus(): string {
+    const snapshot = getGovernorSnapshot();
+    const { limits, inFlight, queued } = snapshot;
+    // A zero background limit means background work is paused, not that the limit is missing.
+    const backgroundLimit = limits.background === 0 ? "background paused" : `${limits.background} background`;
+    return [
+        `RAM/CPU optimiser: ${snapshot.enabled ? "enabled" : "disabled"}`,
+        `Level: ${snapshot.level} (pressure ${Math.round(snapshot.pressure * 100)} %)`,
+        `In flight: ${inFlight.user} user / ${inFlight.interactive} interactive / ${inFlight.background} background`,
+        `Queued: ${queued.user} user / ${queued.interactive} interactive / ${queued.background} background`,
+        `Limits: ${limits.user} user / ${limits.interactive} interactive / ${backgroundLimit}`,
+    ].join("\n");
+}
+
 export default class ObsidianLiveSyncPlugin extends Plugin {
     core: LiveSyncCore;
 
@@ -230,14 +256,37 @@ export default class ObsidianLiveSyncPlugin extends Plugin {
     }
 
     private async _startUp() {
-        if (!(await this.core.services.control.onLoad())) return;
+        configureGovernor({
+            isMobile: () => Platform.isMobile,
+            log: (message, level) => this.core.services.API.addLog(message, level ?? LOG_LEVEL_VERBOSE, "governor"),
+        });
+        if (!(await this.core.services.control.onLoad())) {
+            disposeGovernor();
+            return;
+        }
         const onReady = this.core.services.control.onReady.bind(this.core.services.control);
         this.app.workspace.onLayoutReady(onReady);
     }
     override onload() {
+        this.addCommand({
+            id: "resource-governor-toggle",
+            name: "Toggle RAM/CPU optimiser",
+            callback: () => {
+                const updated = setGovernorConfig({ enabled: !getGovernorConfig().enabled });
+                new Notice(`RAM/CPU optimiser ${updated.enabled ? "enabled" : "disabled"}.`);
+            },
+        });
+        this.addCommand({
+            id: "resource-governor-status",
+            name: "Show RAM/CPU optimiser status",
+            callback: () => {
+                new Notice(describeGovernorStatus());
+            },
+        });
         void this._startUp();
     }
     override onunload(): void {
+        disposeGovernor();
         void withOwnedResource(this.core.getModule(ModuleLog).logResource, () =>
             this.core.services.control.onUnload().catch((error) => {
                 this.core.services.API.addLog(

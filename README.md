@@ -1,5 +1,10 @@
-# Self-hosted LiveSync
-[Japanese docs](./README_ja.md) - [Chinese docs](./README_cn.md).
+# Self-hosted LiveSync Efficient
+
+This is the Efficient fork of [Self-hosted LiveSync](https://github.com/vrtmrz/obsidian-livesync), maintained by [steimerbyte](https://github.com/steimerbyte). It keeps the upstream synchronisation protocol and adds a load-aware RAM/CPU optimiser, bounded file reads, and the performance work documented under [Performance and Resource Usage](#performance-and-resource-usage).
+
+- Plug-in ID: `livesync-efficient` (deliberately distinct from upstream, so Community Plugins updates cannot overwrite this fork).
+- Install with BRAT from `steimerbyte/obsidian-livesync`, or copy the release assets into `.obsidian/plugins/livesync-efficient/`.
+- Upstream documentation: [Japanese docs](./README_ja.md) - [Chinese docs](./README_cn.md).
 
 Self-hosted LiveSync is a community-developed synchronisation plug-in available on all Obsidian-compatible platforms. It leverages robust server solutions such as CouchDB or object storage systems (e.g., MinIO, S3, R2, etc.) to ensure reliable data synchronisation.
 
@@ -173,6 +178,41 @@ Measured on a local production build (`npm run build`, `gzip -6 main.js`):
 
 - Production compression runs two Terser passes. Class and function names, property names, and top-level bindings remain unmangled because the plug-in uses `constructor.name` for add-on discovery and diagnostic labels.
 
+### RAM/CPU optimiser
+
+A small resource governor admits work by priority class instead of letting every phase start at the same time. It is enabled by default and adds no dependency.
+
+| Setting | Desktop | Mobile |
+| --- | ---: | ---: |
+| Default state | enabled | enabled |
+| Concurrent tasks: user / interactive / background | 4 / 2 / 2 | 2 / 2 / 1 |
+| Concurrent tasks under pressure: user / interactive / background | 1 / 1 / 0 | 1 / 1 / 0 |
+| Background queue | 32 | 32 |
+| High-pressure threshold → release | 55 % → 45 % | 55 % → 45 % |
+
+Priority classes:
+
+- **user** — a command or UI action the user is waiting for. Always admitted.
+- **interactive** — work started by the user's current activity. Admitted unless the device is loaded.
+- **background** — sweeps, scans and maintenance. Per-file work queues until a slot is free; periodic phases skip their tick instead. A phase that asks for the duplicate check is not queued again while it is already queued or running.
+
+The governor switches to the high-pressure limits at a pressure of 55 % and returns to the normal limits at 45 %. Pressure combines the smoothed event-loop lag, long-task duration and, where the browser still reports it, the heap ratio. It is sampled every 500 ms and not at all while the application is hidden. After a user or interactive task runs for two seconds or longer, background work is held back for a few seconds so that the interaction finishes first. A background limit of 0 pauses background work rather than rejecting it.
+
+Commands:
+
+- **Toggle RAM/CPU optimiser** — switches the governor on or off for this device. A disabled governor passes every call straight through.
+- **Show RAM/CPU optimiser status** — reports the state, level, pressure, in-flight and queued work, and the effective limits.
+
+The state is kept per device in `localStorage` under `livesync-resource-governor-v1`. It is not part of the settings file and is not synchronised, because the memory budget belongs to the device.
+
+#### Read size guard
+
+Every read the plug-in performs is checked against the file size first. The limit is 16 MiB on mobile and 64 MiB on desktop, and a non-zero **Maximum file size** setting lowers it further; its default of 50 MB therefore lowers the desktop limit to 50 MB, while the mobile limit stays at 16 MiB. A larger file is not read: the refusal is logged once per path at notice level and the read fails. Writes, listings and metadata reads are not affected.
+
+Reads performed by Obsidian itself — opening a note, rendering an embed, indexing the Vault — do not pass through the plug-in and cannot be intercepted, delayed or refused. A file that crashes Obsidian natively is therefore fixed by excluding it with an ignore file or moving it out of the Vault, not by the guard.
+
+The reasoning and the deliberate exclusions are recorded in the [resource governor ADR](docs/adr/2026_11_resource_governor.md).
+
 ### Remaining upstream work
 
 The following costs live in `@vrtmrz/livesync-commonlib` and are not changed by this fork:
@@ -187,7 +227,7 @@ The following costs live in `@vrtmrz/livesync-commonlib` and are not changed by 
 - If you want a faster and simpler initial replication when setting up subsequent devices, see the [Fast Setup Guide](docs/tips/fast-setup.md).
 - Configure [Hidden File Sync](docs/tips/hidden-file-sync.md) only after ordinary note synchronisation works.
 - If Obsidian or LiveSync cannot start normally, use [Recovery and flag files](docs/recovery.md) before changing or resetting a remote database.
-- Self-hosted LiveSync 1.0 requires Obsidian 1.7.2 or later. If you need to use 1.0 on an earlier Obsidian version, please [open an issue](https://github.com/vrtmrz/obsidian-livesync/issues/new?template=issue-report.md) with your version, platform, and reason for remaining on it so that we can assess whether extending support is practical. The standard Community Plugins installer otherwise selects an older compatible plug-in release.
+- Self-hosted LiveSync 1.0 requires Obsidian 1.7.2 or later. This fork is distributed through GitHub releases and BRAT, not the Community Plugins store; if you need an older Obsidian version, [open an issue](https://github.com/steimerbyte/obsidian-livesync/issues/new) with your version and platform.
 - If you are having problems getting the plug-in working, see [Tips and Troubleshooting](docs/troubleshooting.md).
 
 ## Acknowledgements

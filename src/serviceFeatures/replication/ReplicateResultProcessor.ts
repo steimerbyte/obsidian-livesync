@@ -24,7 +24,7 @@ import {
     type LOG_LEVEL,
 } from "@vrtmrz/livesync-commonlib/compat/common/logger";
 import { fireAndForget, isAnyNote, throttle } from "@vrtmrz/livesync-commonlib/compat/common/utils";
-import { Semaphore } from "octagonal-wheels/concurrency/semaphore_v2";
+import { Semaphore, type SemaphoreObject } from "octagonal-wheels/concurrency/semaphore_v2";
 import { withCounting } from "octagonal-wheels/concurrency/counting";
 import { withLock } from "octagonal-wheels/concurrency/lock";
 import type { ReactiveSource } from "octagonal-wheels/dataobject/reactive_v2";
@@ -43,7 +43,7 @@ type ReplicateResultProcessorSettings = Pick<
 > & { pathNormalizationVersion?: 0 | 1 };
 type ReplicateResultProcessorServices = Pick<
     LiveSyncBaseCore["services"],
-    "appLifecycle" | "database" | "path" | "replication" | "vault"
+    "API" | "appLifecycle" | "database" | "path" | "replication" | "vault"
 >;
 
 /**
@@ -101,7 +101,11 @@ export class ReplicateResultProcessor {
     constructor(
         private readonly context: ReplicateResultProcessorContext,
         private waitingForDatabaseReset = false
-    ) {}
+    ) {
+        // The context is unavailable during field initialisation, so the limit is resolved here.
+        // Mobile gets four slots: each one may hold parsed entries and chunk bodies in RAM at once.
+        this._semaphore = Semaphore(this.services.API.isMobile() ? 4 : 10);
+    }
 
     /** Discard old reflection work only after the requested startup database replacement succeeds. */
     public async completeStartupDatabaseReset(): Promise<void> {
@@ -416,11 +420,11 @@ export class ReplicateResultProcessor {
     }
 
     /**
-     * Semaphore limiting the concurrent application work. The ten slots are shared
+     * Semaphore limiting the concurrent application work. The slots are shared
      * between the dequeue loop and `applyToDatabase`; the loop waits here only while
-     * every slot is in use.
+     * every slot is in use. The limit is set in the constructor.
      */
-    private _semaphore = Semaphore(10);
+    private readonly _semaphore: SemaphoreObject;
 
     /**
      * Flag indicating whether the process queue is currently running.

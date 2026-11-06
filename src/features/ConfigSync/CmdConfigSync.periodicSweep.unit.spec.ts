@@ -13,6 +13,13 @@ vi.mock("@/modules/features/InteractiveConflictResolving/ConflictResolveModal.ts
     ConflictResolveModal: class ConflictResolveModal {},
 }));
 vi.mock("@/modules/features/ModuleLog.ts", () => ({ MARK_DONE: "" }));
+vi.mock("@/common/resourceGovernor.ts", () => ({
+    run: async (_priority: string, _label: string, task: () => Promise<unknown>) => await task(),
+    tryRunBackground: async (_label: string, task: () => Promise<unknown>) => {
+        await task();
+        return true;
+    },
+}));
 vi.mock("@/common/utils.ts", () => ({
     cancelTask: vi.fn(),
     EVEN: Symbol("even"),

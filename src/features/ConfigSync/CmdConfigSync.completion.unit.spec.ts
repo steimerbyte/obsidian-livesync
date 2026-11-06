@@ -34,6 +34,13 @@ vi.mock("@/common/utils.ts", () => ({
 vi.mock("@/common/PeriodicProcessor.ts", () => ({
     PeriodicProcessor: class PeriodicProcessor {},
 }));
+vi.mock("@/common/resourceGovernor.ts", () => ({
+    run: async (_priority: string, _label: string, task: () => Promise<unknown>) => await task(),
+    tryRunBackground: async (_label: string, task: () => Promise<unknown>) => {
+        await task();
+        return true;
+    },
+}));
 vi.mock("@/common/events.ts", () => ({
     EVENT_REQUEST_OPEN_PLUGIN_SYNC_DIALOG: "open-plugin-sync",
     eventHub: {
@@ -84,6 +91,7 @@ async function createConfigSync(useV2 = false) {
             isMarkedAsSameChanges: vi.fn(),
             markChangesAreSame: vi.fn(),
         },
+        vault: { isFileSizeTooLarge: vi.fn(() => false) },
     };
     const config = Object.create(ConfigSync.prototype) as ConfigSync;
     Object.assign(config, {

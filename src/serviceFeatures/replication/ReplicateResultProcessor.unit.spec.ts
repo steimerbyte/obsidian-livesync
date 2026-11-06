@@ -67,6 +67,7 @@ function setup(options: SetupOptions = {}) {
     } as PouchDB.Database<EntryDoc>;
     const core = {
         services: {
+            API: { isMobile: vi.fn(() => false) },
             appLifecycle: { isReady, isSuspended: () => false },
             database: { isDatabaseReady: () => options.databaseReady ?? true },
             path: { getPath: (entry: { path: string }) => entry.path },
@@ -571,6 +572,7 @@ describe("ReplicateResultProcessor", () => {
         const getLocalDatabase = vi.fn(() => ({ findAllNormalDocs }));
         const processor = new ReplicateResultProcessor({
             getLocalDatabase,
+            services: { API: { isMobile: () => false } },
         } as never);
         const enqueueAll = vi.spyOn(processor, "enqueueAll").mockImplementation(() => undefined);
 

@@ -93,6 +93,32 @@ describe("performBatchWithProgress", () => {
         expect(peak).toBeLessThanOrEqual(10);
     });
 
+    it("never runs more than the explicit concurrency", async () => {
+        let inFlight = 0;
+        let peak = 0;
+        const processItem = vi.fn(async () => {
+            inFlight++;
+            peak = Math.max(peak, inFlight);
+            await Promise.resolve();
+            inFlight--;
+        });
+
+        await performBatchWithProgress(
+            Array.from({ length: 20 }, (_, index) => index),
+            10,
+            {
+                processItem,
+                onProgress: vi.fn(),
+                onItemError: vi.fn(),
+                onDone: vi.fn(),
+                concurrency: 3,
+            }
+        );
+
+        expect(processItem).toHaveBeenCalledTimes(20);
+        expect(peak).toBe(3);
+    });
+
     it("routes a progress callback error through the item error handler", async () => {
         const error = new Error("Progress callback failed");
         const onProgress = vi.fn(() => {

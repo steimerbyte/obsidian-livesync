@@ -7,7 +7,9 @@ describe("ReplicateResultProcessor.withCounting", () => {
     it("counts overlapping callbacks until each settles and preserves results and errors", async () => {
         const originalCount = 7;
         const count = reactiveSource(originalCount);
-        const processor = new ReplicateResultProcessor({} as never);
+        const processor = new ReplicateResultProcessor({
+            services: { API: { isMobile: () => false } },
+        } as never);
         const firstResult = { task: "first" };
         const firstResultGate = promiseWithResolvers<typeof firstResult>();
         const secondResultGate = promiseWithResolvers<string>();

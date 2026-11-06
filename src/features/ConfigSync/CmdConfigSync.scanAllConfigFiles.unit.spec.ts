@@ -18,12 +18,15 @@ vi.mock("@/modules/features/InteractiveConflictResolving/ConflictResolveModal.ts
 }));
 vi.mock("@/features/LiveSyncCommands.ts", () => ({
     LiveSyncCommands: class LiveSyncCommands {
-        core!: { services: unknown; localDatabase: unknown };
+        core!: { services: unknown; localDatabase: unknown; settings: unknown };
         get localDatabase() {
             return this.core.localDatabase;
         }
         get services() {
             return this.core.services;
+        }
+        get settings() {
+            return this.core.settings;
         }
     },
 }));
@@ -41,6 +44,13 @@ vi.mock("@/common/utils.ts", () => ({
 vi.mock("@/common/PeriodicProcessor.ts", () => ({
     PeriodicProcessor: class PeriodicProcessor {},
 }));
+vi.mock("@/common/resourceGovernor.ts", () => ({
+    run: async (_priority: string, _label: string, task: () => Promise<unknown>) => await task(),
+    tryRunBackground: async (_label: string, task: () => Promise<unknown>) => {
+        await task();
+        return true;
+    },
+}));
 vi.mock("@/common/events.ts", () => ({
     EVENT_REQUEST_OPEN_PLUGIN_SYNC_DIALOG: "open-plugin-sync",
     eventHub: {
@@ -56,7 +66,7 @@ vi.mock("@/common/obsidianCommunityPlugins.ts", () => ({
 
 vi.mock("octagonal-wheels/concurrency/scoped.iteration", { spy: true });
 
-import { LOG_LEVEL_VERBOSE, type FilePath } from "@vrtmrz/livesync-commonlib/compat/common/types";
+import { LOG_LEVEL_VERBOSE, MODE_PAUSED, type FilePath } from "@vrtmrz/livesync-commonlib/compat/common/types";
 import * as iterationModule from "octagonal-wheels/concurrency/scoped.iteration";
 import { promiseWithResolvers } from "octagonal-wheels/promises";
 import { ConfigSync } from "./CmdConfigSync";
@@ -67,7 +77,7 @@ const keyOf = (path: string) => prefix + path;
 type Row = { _id: string; path: string; deleted?: boolean };
 const row = (name: string, path = keyOf(name)): Row => ({ _id: keyOf(name), path });
 
-function setup(files: string[] = [], rows: Row[] = [], usePluginSyncV2 = true) {
+function setup(files: string[] = [], rows: Row[] = [], usePluginSyncV2 = true, pausedKeys: string[] = []) {
     const events: string[] = [];
     const findEntries = vi.fn(async function* () {
         yield* rows;
@@ -84,12 +94,17 @@ function setup(files: string[] = [], rows: Row[] = [], usePluginSyncV2 = true) {
     });
     const updatePluginList = vi.fn(async (_showMessage: boolean) => {});
     const log = vi.fn();
+    const pluginSyncExtendedSetting: Record<string, { key: string; mode: number; files: string[] }> = {};
+    for (const key of pausedKeys) pluginSyncExtendedSetting[key] = { key, mode: MODE_PAUSED, files: [] };
     const configSync = Object.create(ConfigSync.prototype) as ConfigSync;
     Object.assign(configSync, {
         core: {
-            settings: { usePluginSyncV2 },
+            settings: { usePluginSyncV2, pluginSyncExtendedSetting },
             localDatabase: { findEntries },
-            services: { setting: { getDeviceAndVaultName: () => term } },
+            services: {
+                API: { getSystemConfigDir: () => ".obsidian" },
+                setting: { getDeviceAndVaultName: () => term },
+            },
         },
         scanInternalFiles,
         isTargetPath: (path: string) => path !== "ignored",
@@ -254,6 +269,26 @@ describe("ConfigSync V2 scan behaviour", () => {
         expect(fixture.log).toHaveBeenCalledWith(error, LOG_LEVEL_VERBOSE);
         expect(fixture.updatePluginList).toHaveBeenCalledOnce();
     });
+
+    it("neither stores nor deletes a paused plugin group, and still stores its neighbours", async () => {
+        const fixture = setup(
+            [".obsidian/plugins/foo/main.js", ".obsidian/plugins/bar/main.js"],
+            [row(".obsidian/plugins/foo/main.js"), row(".obsidian/plugins/bar/main.js")],
+            true,
+            ["PLUGIN_MAIN/foo"]
+        );
+        await fixture.configSync.scanAllConfigFiles(false);
+
+        expect(fixture.storeCustomisationFileV2.mock.calls).toEqual([[".obsidian/plugins/bar/main.js", term]]);
+        expect(fixture.deleteConfigOnDatabase).not.toHaveBeenCalled();
+    });
+
+    it("matches a paused CONFIG entry by exact path only", async () => {
+        const fixture = setup([".obsidian/app.json", ".obsidian/appearance.json"], [], true, ["CONFIG/app.json"]);
+        await fixture.configSync.scanAllConfigFiles(false);
+
+        expect(fixture.storeCustomisationFileV2.mock.calls).toEqual([[".obsidian/appearance.json", term]]);
+    });
 });
 
 describe("ConfigSync V1 scan behaviour", () => {
@@ -282,6 +317,19 @@ describe("ConfigSync V1 scan behaviour", () => {
         expect(fixture.deleteConfigOnDatabase).not.toHaveBeenCalledWith("ix:other-device/PLUGIN_MAIN/other.md");
         expect(fixture.deleteConfigOnDatabase).not.toHaveBeenCalledWith(keyOf("gone"));
         expect(fixture.events).toEqual([`store:matched`]);
+    });
+
+    it("skips a paused group without deleting its database document", async () => {
+        const fixture = setup(
+            [".obsidian/plugins/foo/main.js", ".obsidian/plugins/bar/main.js"],
+            [row(".obsidian/plugins/foo/main.js"), row(".obsidian/plugins/bar/main.js")],
+            false,
+            ["PLUGIN_ALL/foo"]
+        );
+        await fixture.configSync.scanAllConfigFiles(false);
+
+        expect(fixture.storeCustomizationFiles).toHaveBeenCalledExactlyOnceWith(".obsidian/plugins/bar/main.js");
+        expect(fixture.deleteConfigOnDatabase).not.toHaveBeenCalled();
     });
 });
 

@@ -27,6 +27,7 @@ import {
     LOG_LEVEL_INFO,
     LOG_LEVEL_NOTICE,
     LOG_LEVEL_VERBOSE,
+    MODE_PAUSED,
     MODE_SELECTIVE,
     MODE_SHINY,
 } from "@vrtmrz/livesync-commonlib/compat/common/types";
@@ -74,6 +75,7 @@ import type { HandlerOutcome } from "@vrtmrz/livesync-commonlib/compat/services/
 import type { OptionalFileEventOptions } from "@vrtmrz/livesync-commonlib/compat/services/base/IService";
 import { PendingConfigSaves } from "./PendingConfigSaves";
 import { ConfigScanQueue } from "./ConfigScanQueue";
+import { run, tryRunBackground } from "@/common/resourceGovernor.ts";
 
 const d = "\u200b";
 const d2 = "\n";
@@ -414,7 +416,8 @@ export class ConfigSync extends LiveSyncCommands {
     pluginDialog?: PluginDialogModal = undefined;
     periodicPluginSweepProcessor = new PeriodicProcessor(
         this.core,
-        async () => !this._isMainSuspended() && (await this.scanAllConfigFiles(false))
+        async () =>
+            !this._isMainSuspended() && (await tryRunBackground("config-sweep", () => this.scanAllConfigFiles(false)))
     );
 
     pluginList: IPluginDataExDisplay[] = [];
@@ -506,11 +509,46 @@ export class ConfigSync extends LiveSyncCommands {
         // Idea non-filter option?
         return this.getFileCategory(filePath) != "";
     }
+    /**
+     * Whether the path is paused (ignored) by Customisation Sync.
+     *
+     * Paused paths must not be stored, updated or deleted by this module. The entry
+     * key is used rather than its file list, so that a paused group covers files that
+     * the catalogue has not enumerated yet.
+     */
+    private isPausedConfigPath(path: FilePath): boolean {
+        const configDir = normalizePath(this.configDir).toLowerCase();
+        const target = path.toLowerCase();
+        const isUnder = (folder: string) => target.startsWith(`${configDir}/${folder.toLowerCase()}/`);
+        const isExact = (file: string) => target === `${configDir}/${file.toLowerCase()}`;
+        return Object.values(this.settings.pluginSyncExtendedSetting).some((entry) => {
+            if (entry.mode !== MODE_PAUSED) return false;
+            const separator = entry.key.indexOf("/");
+            if (separator < 0) return false;
+            const category = entry.key.substring(0, separator);
+            const name = entry.key.substring(separator + 1);
+            switch (category) {
+                case "PLUGIN_ALL":
+                case "PLUGIN_MAIN":
+                case "PLUGIN_DATA":
+                case "PLUGIN_ETC":
+                    return isUnder(`plugins/${name}`);
+                case "THEME":
+                    return isUnder(`themes/${name}`);
+                case "SNIPPET":
+                    return isExact(`snippets/${name}`);
+                case "CONFIG":
+                    return isExact(name);
+                default:
+                    return false;
+            }
+        });
+    }
     private async _everyOnDatabaseInitialized(showNotice: boolean) {
         if (!this.isThisModuleEnabled()) return true;
         try {
             this._log("Scanning customizations...");
-            await this.scanAllConfigFiles(showNotice);
+            await run("background", "config-sweep", () => this.scanAllConfigFiles(showNotice));
             this._log("Scanning customizations : done");
         } catch (ex) {
             this._log("Scanning customizations : failed");
@@ -521,8 +559,9 @@ export class ConfigSync extends LiveSyncCommands {
     async _everyBeforeReplicate(showNotice: boolean) {
         if (!this.isThisModuleEnabled()) return true;
         if (this.settings.autoSweepPlugins) {
-            await this.scanAllConfigFiles(showNotice);
-            return true;
+            if (!(await tryRunBackground("config-sweep", () => this.scanAllConfigFiles(showNotice)))) {
+                this._log("Scanning customizations : deferred (device is busy)", LOG_LEVEL_VERBOSE);
+            }
         }
         return true;
     }
@@ -532,7 +571,9 @@ export class ConfigSync extends LiveSyncCommands {
             return true;
         }
         if (this.settings.autoSweepPlugins) {
-            await this.scanAllConfigFiles(false);
+            if (!(await tryRunBackground("config-sweep", () => this.scanAllConfigFiles(false)))) {
+                this._log("Scanning customizations : deferred (device is busy)", LOG_LEVEL_VERBOSE);
+            }
         }
         this.periodicPluginSweepProcessor.enable(
             this.settings.autoSweepPluginsPeriodic && !this.settings.watchInternalFileChanges
@@ -1220,11 +1261,22 @@ export class ConfigSync extends LiveSyncCommands {
     }
 
     recentProcessedInternalFiles = [] as string[];
+    /**
+     * Refuse to read a configuration file that is too large to be synchronised.
+     * The size is known from the stat, so nothing is read for such a file.
+     */
+    private isTooLargeToStore(size: number): boolean {
+        return this.services.vault.isFileSizeTooLarge?.(size) ?? false;
+    }
     async makeEntryFromFile(path: FilePath, requireCompletion = false): Promise<false | PluginDataExFile> {
         const stat = await this.core.storageAccess.statHidden(path);
         let version: string | undefined;
         let displayName: string | undefined;
         if (!stat) {
+            return false;
+        }
+        if (this.isTooLargeToStore(stat.size)) {
+            this._log(`Config: skipped (too large to synchronise): ${path}`, LOG_LEVEL_NOTICE);
             return false;
         }
         const contentBin = await this.core.storageAccess.readHiddenFileBinary(path);
@@ -1287,6 +1339,11 @@ export class ConfigSync extends LiveSyncCommands {
             if (!stat) {
                 if (!requireCompletion) return false;
                 return await this.deleteConfigOnDatabaseCore(vf, force, true);
+            }
+            // Refused before the body is read, so an oversized file costs nothing.
+            if (this.isTooLargeToStore(stat.size)) {
+                this._log(`STORAGE --> DB:${prefixedFileName}: (config) Skipped (too large)`, LOG_LEVEL_VERBOSE);
+                return false;
             }
             const mtime = stat.mtime;
             const content = await this.core.storageAccess.readHiddenFileBinary(path);
@@ -1524,6 +1581,7 @@ export class ConfigSync extends LiveSyncCommands {
         options?: OptionalFileEventOptions
     ): Promise<HandlerOutcome<void, string>> {
         if (!this.isThisModuleEnabled() || !this.isTargetPath(path)) return { kind: "not-applicable" };
+        if (this.isPausedConfigPath(path)) return { kind: "not-applicable" };
         const configDir = normalizePath(this.configDir);
         const handledElsewhere = Object.values(this.settings.pluginSyncExtendedSetting)
             .filter((entry) => entry.mode !== MODE_SELECTIVE && entry.mode !== MODE_SHINY)
@@ -1542,7 +1600,8 @@ export class ConfigSync extends LiveSyncCommands {
         await this.pendingOptionalSaves.enqueue(
             key,
             async () => {
-                await this.storeCustomizationFilesCore(path, term, true);
+                // A save requested by the user must not queue behind background sweeps.
+                await run("interactive", "config-save", () => this.storeCustomizationFilesCore(path, term, true));
             },
             options?.whenFlushRequested
         );
@@ -1557,6 +1616,7 @@ export class ConfigSync extends LiveSyncCommands {
         if (!this._isMainReady()) return false;
         if (this._isMainSuspended()) return false;
         if (!this.isThisModuleEnabled()) return false;
+        if (this.isPausedConfigPath(path)) return false;
         // if (!this.isTargetPath(path)) return false;
         const stat = await this.core.storageAccess.statHidden(path);
         // Make sure that target is a file.
@@ -1621,7 +1681,15 @@ export class ConfigSync extends LiveSyncCommands {
                             const unifiedFilenameWithKey = `${item._id}` as FilePathWithPrefix;
                             const localPath = ctx.value.localFileMap.get(unifiedFilenameWithKey);
                             if (localPath) {
-                                await this.storeCustomisationFileV2(localPath, ctx.value.term);
+                                // Paused: drop from the map so the store pass skips it, and keep the DB document.
+                                if (this.isPausedConfigPath(localPath)) {
+                                    ctx.value.localFileMap.delete(unifiedFilenameWithKey);
+                                    return;
+                                }
+                                // Interactive leaf: it must never wait behind the background slot the sweep holds.
+                                await run("interactive", "config-store", () =>
+                                    this.storeCustomisationFileV2(localPath, ctx.value.term)
+                                );
                                 ctx.value.localFileMap.delete(unifiedFilenameWithKey);
                             } else {
                                 await this.deleteConfigOnDatabase(unifiedFilenameWithKey);
@@ -1633,7 +1701,10 @@ export class ConfigSync extends LiveSyncCommands {
                     });
                     await forEachInScope(scope, localFileMap.values(), { concurrency: 10 }, async (filePath, ctx) => {
                         try {
-                            await this.storeCustomisationFileV2(filePath, ctx.value.term);
+                            if (this.isPausedConfigPath(filePath)) return;
+                            await run("interactive", "config-store", () =>
+                                this.storeCustomisationFileV2(filePath, ctx.value.term)
+                            );
                         } catch (ex) {
                             this._log(`scanAllConfigFiles - Error: ${filePath}`, LOG_LEVEL_VERBOSE);
                             this._log(ex, LOG_LEVEL_VERBOSE);
@@ -1661,7 +1732,12 @@ export class ConfigSync extends LiveSyncCommands {
                         this._log(`scanAllConfigFiles - File not found: ${vp}`, LOG_LEVEL_VERBOSE);
                         continue;
                     }
-                    await this.storeCustomizationFiles(p);
+                    // Paused files keep their database documents; they must not stay deletion candidates.
+                    if (this.isPausedConfigPath(p)) {
+                        deleteCandidate = deleteCandidate.filter((e) => e != vp);
+                        continue;
+                    }
+                    await run("interactive", "config-store", () => this.storeCustomizationFiles(p));
                     deleteCandidate = deleteCandidate.filter((e) => e != vp);
                 }
                 for (const vp of deleteCandidate) {
