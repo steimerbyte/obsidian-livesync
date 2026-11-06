@@ -61,6 +61,7 @@ import { performBatchWithProgress } from "./performBatchWithProgress.ts";
 import type { OptionalSyncFeatureMode } from "@/features/optionalSyncFeatures.ts";
 import { getObsidianCommunityPluginManager } from "@/common/obsidianCommunityPlugins.ts";
 import { $msg } from "@/common/translation";
+import { completeStartupPhase, reportStartupPhaseProgress } from "@/common/startupProgress";
 type SyncDirection = "push" | "pull" | "safe" | "pullForce" | "pushForce";
 
 type HiddenFileInitialisationProgress = {
@@ -708,10 +709,7 @@ Offline Changed files: ${processFiles.length}`;
                 } else if (type == "modified") {
                     this._log(`Modification detected:${path}`, LOG_LEVEL_VERBOSE);
                     if (stat != null && this.isTooLargeToStore(stat.size)) {
-                        this._log(
-                            `Hidden file:${path} is too large to store. Skipped reading it.`,
-                            LOG_LEVEL_NOTICE
-                        );
+                        this._log(`Hidden file:${path} is too large to store. Skipped reading it.`, LOG_LEVEL_NOTICE);
                         return undefined;
                     }
                     const fileInfo = await this.loadFileWithInfo(path);
@@ -1222,6 +1220,9 @@ Offline Changed files: ${processFiles.length}`;
                 currentDatabaseFileNames.filter((e) => !this._databaseInfoLastProcessed.has(e))
             );
             const bothUntracked = untrackedLocal.filter((e) => untrackedDatabase.has(e));
+            // Progress counts finished files: `attempted` rises as work starts, this counter as it ends.
+            let finished = 0;
+            reportStartupPhaseProgress("hidden-files", 0, bothUntracked.length);
             p.log("Applying untracked changes...");
             const stat = `Tracking statics:
 Local files: ${currentStorageFiles.length}
@@ -1270,11 +1271,13 @@ Common untracked files: ${bothUntracked.length}`;
                     }
                 } finally {
                     rel();
+                    reportStartupPhaseProgress("hidden-files", ++finished);
                 }
             });
             await Promise.all(allProcesses);
             await this.scanAllStorageChanges(showNotice);
             await this.scanAllDatabaseChanges(showNotice);
+            completeStartupPhase("hidden-files");
 
             p.done();
         });

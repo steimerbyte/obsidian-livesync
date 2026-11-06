@@ -1,5 +1,6 @@
 import { Platform, setIcon, type App } from "@/deps.ts";
 import { openObsidianSettings } from "@/common/obsidianSettings.ts";
+import { startupProgress } from "@/common/startupProgress.ts";
 import { requestUserInitiatedReplication } from "@/serviceFeatures/manualReplication.ts";
 import type { LiveSyncCore } from "@/main.ts";
 import { ModuleLog } from "./ModuleLog.ts";
@@ -56,13 +57,14 @@ export class SyncStatusBubble {
     private root!: HTMLElement;
     private orb!: HTMLButtonElement;
     private iconEl!: HTMLElement;
+    private startupPercentEl!: HTMLElement;
     private progressRing!: HTMLElement;
     private card!: HTMLElement;
     private headlineEl!: HTMLElement;
     private detailEl!: HTMLElement;
     private barEl!: HTMLElement;
-    private barFill!: HTMLElement;
     private categoriesEl!: HTMLElement;
+    private logEl!: HTMLElement;
     private liveStatusEl!: HTMLElement;
     private messageEl!: HTMLElement;
     private messageTitleEl!: HTMLElement;
@@ -104,7 +106,12 @@ export class SyncStatusBubble {
         this.progressRing = this.orb.createSpan({ cls: "lsb-progress-ring is-hidden" });
         this.orb.createSpan({ cls: "lsb-ring" });
         this.iconEl = this.orb.createSpan({ cls: "lsb-icon" });
-        this.orb.createSpan({ cls: "lsb-pulse" });
+        // The percentage is decoration: the orb's aria-label already carries the full sentence.
+        this.startupPercentEl = this.orb.createSpan({
+            cls: "lsb-startup-percent",
+            attr: { "aria-hidden": "true" },
+        });
+        this.startupPercentEl.hidden = true;
 
         this.card = root.createDiv({
             cls: "lsb-card",
@@ -129,17 +136,21 @@ export class SyncStatusBubble {
         this.headlineEl = this.card.createDiv({ cls: "lsb-headline" });
         this.detailEl = this.card.createDiv({ cls: "lsb-detail" });
         this.barEl = this.card.createDiv({ cls: "lsb-bar" });
-        this.barFill = this.barEl.createSpan({ cls: "lsb-bar-fill" });
+        this.barEl.createSpan({ cls: "lsb-bar-fill" });
         this.barEl.hidden = true;
-
-        this.categoriesEl = this.card.createDiv({ cls: "lsb-categories" });
-        this.liveStatusEl = this.card.createEl("pre", { cls: "lsb-live-status", attr: { tabindex: "0" } });
-        this.liveStatusEl.hidden = true;
 
         this.messageEl = this.card.createDiv({ cls: "lsb-message" });
         this.messageTitleEl = this.messageEl.createDiv({ cls: "lsb-message-title" });
         this.messageBodyEl = this.messageEl.createDiv({ cls: "lsb-message-body" });
         this.messageEl.hidden = true;
+
+        this.categoriesEl = this.card.createDiv({ cls: "lsb-categories" });
+
+        // Secondary surface: the raw status text is the log, not the summary.
+        this.logEl = this.card.createEl("details", { cls: "lsb-log" });
+        this.logEl.hidden = true;
+        this.logEl.createEl("summary", { cls: "lsb-log-toggle", text: "Recent activity" });
+        this.liveStatusEl = this.logEl.createEl("pre", { cls: "lsb-live-status", attr: { tabindex: "0" } });
 
         const actions = this.card.createDiv({ cls: "lsb-actions" });
         const addAction = (label: string, primary: boolean, onClick: () => void) => {
@@ -214,6 +225,7 @@ export class SyncStatusBubble {
 
         return {
             ready: this.core.services.appLifecycle.isReady(),
+            startup: startupProgress.value,
             syncStatus: stats?.syncStatus ?? "",
             maxPullSeq: stats?.maxPullSeq ?? 0,
             lastSyncPullSeq: stats?.lastSyncPullSeq ?? 0,
@@ -285,6 +297,7 @@ export class SyncStatusBubble {
             state.headline,
             state.detail,
             state.progress,
+            state.startup,
             this.message?.title,
             this.message?.body,
         ]);
@@ -292,7 +305,10 @@ export class SyncStatusBubble {
         this.lastSignature = signature;
 
         for (const tone of TONE_CLASSES) this.root.classList.toggle(`is-${tone}`, tone === state.tone);
-        this.root.style.setProperty("--lsb-progress", String(Math.round((state.progress ?? 0) * 100)));
+        // Pre-computed strings, so the CSS needs no calc() arithmetic on the custom properties.
+        const percent = Math.round((state.progress ?? 0) * 100);
+        this.root.style.setProperty("--lsb-progress-percent", `${percent}%`);
+        this.root.style.setProperty("--lsb-progress-scale", String(percent / 100));
         if (state.icon !== this.lastIcon) {
             setIcon(this.iconEl, state.icon);
             this.lastIcon = state.icon;
@@ -301,8 +317,21 @@ export class SyncStatusBubble {
         this.detailEl.textContent = state.detail;
         this.orb.setAttr("aria-label", `LiveSync: ${state.headline}. ${state.detail}`);
         this.barEl.hidden = state.progress === undefined || state.tone !== "syncing";
-        this.barFill.style.width = `${Math.round((state.progress ?? 0) * 100)}%`;
-        this.progressRing.classList.toggle("is-hidden", state.tone !== "syncing" || state.progress === undefined);
+        const startup = state.startup;
+        this.startupPercentEl.hidden = startup === undefined;
+        if (startup) {
+            this.startupPercentEl.textContent = `${startup.percent}%`;
+            // Counts belong in the tooltip only; paths and file names never reach the bubble.
+            if (startup.total > 0) {
+                this.startupPercentEl.setAttr("title", `${startup.completed} / ${startup.total}`);
+            } else {
+                this.startupPercentEl.removeAttribute("title");
+            }
+        }
+        // The arc reports progress: determinate while totals are known, breathing while they are not.
+        const showArc = state.tone === "syncing" || state.tone === "starting";
+        this.progressRing.classList.toggle("is-hidden", !showArc);
+        this.progressRing.classList.toggle("is-indeterminate", showArc && state.progress === undefined);
 
         const hasMessage = this.message !== undefined;
         this.messageEl.hidden = !hasMessage;
@@ -332,7 +361,7 @@ export class SyncStatusBubble {
         if (text !== this.lastLiveStatus) {
             this.lastLiveStatus = text;
             this.liveStatusEl.textContent = text;
-            this.liveStatusEl.hidden = text === "";
+            this.logEl.hidden = text === "";
         }
     }
 

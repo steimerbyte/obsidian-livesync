@@ -64,6 +64,7 @@ import { withScope } from "octagonal-wheels/resource/scope";
 import { EVENT_REQUEST_OPEN_PLUGIN_SYNC_DIALOG, eventHub } from "@/common/events.ts";
 import { PluginDialogModal } from "./PluginDialogModal.ts";
 import { $msg } from "@/common/translation";
+import { completeStartupPhase, reportStartupPhaseProgress } from "@/common/startupProgress";
 import type { InjectableServiceHub } from "@vrtmrz/livesync-commonlib/compat/services/implements/injectable/InjectableServiceHub";
 import type { LiveSyncCore } from "@/main.ts";
 import { LiveSyncError } from "@vrtmrz/livesync-commonlib/compat/common/LSError";
@@ -1675,6 +1676,10 @@ export class ConfigSync extends LiveSyncCommands {
                 for await (const item of entries) {
                     if (item.path.indexOf("%") === -1) databaseEntries.push(item);
                 }
+                // Every database entry visits once below, and every local file left in the map after
+                // that pass visits once in the store pass, so the initial sizes are the phase total.
+                let processed = 0;
+                reportStartupPhaseProgress("customisations", 0, databaseEntries.length + localFileMap.size);
                 await withScope({ term, localFileMap }, async (scope) => {
                     await forEachInScope(scope, databaseEntries, { concurrency: 10 }, async (item, ctx) => {
                         try {
@@ -1697,6 +1702,8 @@ export class ConfigSync extends LiveSyncCommands {
                         } catch (ex) {
                             this._log(`scanAllConfigFiles - Error: ${item._id}`, LOG_LEVEL_VERBOSE);
                             this._log(ex, LOG_LEVEL_VERBOSE);
+                        } finally {
+                            reportStartupPhaseProgress("customisations", ++processed);
                         }
                     });
                     await forEachInScope(scope, localFileMap.values(), { concurrency: 10 }, async (filePath, ctx) => {
@@ -1708,9 +1715,12 @@ export class ConfigSync extends LiveSyncCommands {
                         } catch (ex) {
                             this._log(`scanAllConfigFiles - Error: ${filePath}`, LOG_LEVEL_VERBOSE);
                             this._log(ex, LOG_LEVEL_VERBOSE);
+                        } finally {
+                            reportStartupPhaseProgress("customisations", ++processed);
                         }
                     });
                 });
+                completeStartupPhase("customisations");
                 fireAndForget(() => this.updatePluginList(false));
             } else {
                 const files = filesAll
@@ -1726,23 +1736,36 @@ export class ConfigSync extends LiveSyncCommands {
                     const path = this.getPath(entry);
                     if (path.startsWith(`${ICXHeader}${term}/`)) deleteCandidate.push(path);
                 }
+                let processed = 0;
+                // Initial candidate count; paused or missing files drop out of the loops as they run.
+                reportStartupPhaseProgress(
+                    "customisations",
+                    0,
+                    virtualPathsOfLocalFiles.length + deleteCandidate.length
+                );
                 for (const vp of virtualPathsOfLocalFiles) {
-                    const p = files.find((e) => e.key == vp)?.file;
-                    if (!p) {
-                        this._log(`scanAllConfigFiles - File not found: ${vp}`, LOG_LEVEL_VERBOSE);
-                        continue;
-                    }
-                    // Paused files keep their database documents; they must not stay deletion candidates.
-                    if (this.isPausedConfigPath(p)) {
+                    try {
+                        const p = files.find((e) => e.key == vp)?.file;
+                        if (!p) {
+                            this._log(`scanAllConfigFiles - File not found: ${vp}`, LOG_LEVEL_VERBOSE);
+                            continue;
+                        }
+                        // Paused files keep their database documents; they must not stay deletion candidates.
+                        if (this.isPausedConfigPath(p)) {
+                            deleteCandidate = deleteCandidate.filter((e) => e != vp);
+                            continue;
+                        }
+                        await run("interactive", "config-store", () => this.storeCustomizationFiles(p));
                         deleteCandidate = deleteCandidate.filter((e) => e != vp);
-                        continue;
+                    } finally {
+                        reportStartupPhaseProgress("customisations", ++processed);
                     }
-                    await run("interactive", "config-store", () => this.storeCustomizationFiles(p));
-                    deleteCandidate = deleteCandidate.filter((e) => e != vp);
                 }
                 for (const vp of deleteCandidate) {
                     await this.deleteConfigOnDatabase(vp);
+                    reportStartupPhaseProgress("customisations", ++processed);
                 }
+                completeStartupPhase("customisations");
                 fireAndForget(() => this.updatePluginList(false));
             }
         });

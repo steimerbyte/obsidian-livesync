@@ -60,6 +60,7 @@ import { MARK_LOG_NETWORK_ERROR, type LogFunction } from "@vrtmrz/livesync-commo
 import { NetworkWarningStyles } from "@vrtmrz/livesync-commonlib/compat/common/models/setting.const";
 import { compatGlobal } from "@vrtmrz/livesync-commonlib/compat/common/coreEnvFunctions";
 import { generateReport } from "@/common/reportTool.ts";
+import { observeStartupLog } from "@/common/startupProgress.ts";
 import {
     ANDROID_LINUX_PATH_COMPONENT_UTF8_WARNING_BOUNDARY,
     findPathComponentsExceedingUtf8Limit,
@@ -520,7 +521,12 @@ ${stringifyYaml(info)}
     override onBindFunction(core: LiveSyncCore, services: typeof core.services): void {
         const bufferedLog = createBufferedLog(this.recentLogEntries);
         let logTarget: LogFunction = bufferedLog;
-        const log: LogFunction = (message, level, key) => logTarget(message, level, key);
+        const log: LogFunction = (message, level, key) => {
+            // The OfflineScanner reports scanned files only as log lines; this is the one place every
+            // service log passes through before it is buffered or timestamped.
+            observeStartupLog(message);
+            logTarget(message, level, key);
+        };
         services.API.addLog.setHandler(log);
         const collectGlobalLogs = () => {
             const entries = recentGlobalLogEntries.value;

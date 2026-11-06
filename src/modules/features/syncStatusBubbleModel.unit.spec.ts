@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { StartupProgress } from "@/common/startupProgress";
+
 import {
     deriveSyncBubbleCategories,
     deriveSyncBubbleState,
@@ -7,9 +9,19 @@ import {
     type SyncBubbleSnapshot,
 } from "./syncStatusBubbleModel.ts";
 
+const IDLE_STARTUP: StartupProgress = {
+    percent: 0,
+    active: false,
+    phase: null,
+    label: "",
+    completed: 0,
+    total: 0,
+};
+
 function snapshot(overrides: Partial<SyncBubbleSnapshot> = {}): SyncBubbleSnapshot {
     return {
         ready: true,
+        startup: IDLE_STARTUP,
         syncStatus: "COMPLETED",
         maxPullSeq: 0,
         lastSyncPullSeq: 0,
@@ -110,6 +122,64 @@ describe("deriveSyncBubbleState", () => {
         expect(state.headline).toBe("Ready");
         expect(state.detail).toContain("📄 2");
         expect(state.busy).toBe(false);
+    });
+
+    it("reports the running start-up phase and percentage", () => {
+        const state = deriveSyncBubbleState(
+            snapshot({
+                ready: false,
+                startup: {
+                    percent: 38,
+                    active: true,
+                    phase: "customisations",
+                    label: "Syncing customisations",
+                    completed: 1575,
+                    total: 4934,
+                },
+            })
+        );
+
+        expect(state.tone).toBe("starting");
+        expect(state.headline).toBe("Starting LiveSync");
+        expect(state.detail).toBe("Syncing customisations · 38%");
+        expect(state.progress).toBeCloseTo(0.38);
+        expect(state.startup).toEqual({ percent: 38, completed: 1575, total: 4934 });
+    });
+
+    it("opens on the database phase before any phase reports", () => {
+        const state = deriveSyncBubbleState(snapshot({ ready: false, startup: { ...IDLE_STARTUP, active: true } }));
+
+        expect(state.detail).toBe("Opening database · 0%");
+        expect(state.progress).toBe(0);
+        expect(state.startup).toEqual({ percent: 0, completed: 0, total: 0 });
+    });
+
+    it("ignores start-up progress once the plugin is ready", () => {
+        const state = deriveSyncBubbleState(
+            snapshot({
+                ready: true,
+                startup: {
+                    percent: 42,
+                    active: true,
+                    phase: "scan",
+                    label: "Scanning vault",
+                    completed: 10,
+                    total: 100,
+                },
+            })
+        );
+
+        expect(state.tone).toBe("ready");
+        expect(state.startup).toBeUndefined();
+        expect(state.progress).toBeUndefined();
+    });
+
+    it("does not carry the completed start-up percentage into the ready state", () => {
+        const state = deriveSyncBubbleState(snapshot({ ready: true, startup: { ...IDLE_STARTUP, percent: 100 } }));
+
+        expect(state.tone).toBe("ready");
+        expect(state.startup).toBeUndefined();
+        expect(state.detail).not.toContain("100%");
     });
 
     it("keeps errors above a stale configuration-sync flag", () => {

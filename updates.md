@@ -12,6 +12,19 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+## 1.0.52
+
+6th November, 2026
+
+### Changed
+
+- While LiveSync starts, the orb carries a percentage badge and the card names the phase in progress: opening the database, scanning the vault, syncing customisations, syncing hidden files, or finalising. The ring moves with it, breathes while the cost of a phase is unknown, and stops at 99 % until the plug-in is actually ready.
+- The card's raw status text now sits behind a collapsible **Recent activity** block, so the category rows and actions stay readable.
+
+### Internal
+
+- Added a start-up progress store fed only by boundaries the fork can observe: the database-ready and application-ready events, the OfflineScanner's `Processing: x/y` log lines, and the ConfigSync and Hidden File Sync item loops. Within a run the reported percentage never decreases and never reaches 100 before readiness.
+
 ## 1.0.51
 
 6th November, 2026

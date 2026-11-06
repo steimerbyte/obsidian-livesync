@@ -1,3 +1,5 @@
+import type { StartupProgress } from "@/common/startupProgress";
+
 export type SyncBubbleTone = "starting" | "ready" | "syncing" | "config" | "error" | "paused" | "offline";
 
 export type SyncBubbleCategoryTone = "ok" | "warn" | "error";
@@ -17,8 +19,17 @@ export type SyncBubbleStorageQueues = {
     chunk?: number;
 };
 
+/** Numeric start-up badge on the orb; only present while a start-up run is in progress. */
+export type SyncBubbleStartup = {
+    /** Rounded overall percentage, 0-99. */
+    percent: number;
+    completed: number;
+    total: number;
+};
+
 export type SyncBubbleSnapshot = {
     ready: boolean;
+    startup: StartupProgress;
     syncStatus: string;
     maxPullSeq: number;
     lastSyncPullSeq: number;
@@ -38,6 +49,7 @@ export type SyncBubbleState = {
     icon: string;
     progress?: number;
     busy: boolean;
+    startup?: SyncBubbleStartup;
 };
 
 const ACTIVE_STATUSES: Record<string, true> = {
@@ -83,6 +95,21 @@ export function deriveSyncBubbleState(snapshot: SyncBubbleSnapshot): SyncBubbleS
     const queueText = compactText(snapshot.queueText, 120);
 
     if (!snapshot.ready) {
+        const startup = snapshot.startup;
+        if (startup?.active) {
+            // The phase label and the percentage come straight from the start-up store; without a
+            // running phase the database is still opening, which has no measurable fraction.
+            const percent = startup.phase === null ? 0 : Math.max(0, Math.min(99, Math.round(startup.percent)));
+            return {
+                tone: "starting",
+                headline: "Starting LiveSync",
+                detail: `${startup.phase === null ? "Opening database" : startup.label} · ${percent}%`,
+                icon: "hourglass",
+                progress: percent / 100,
+                busy: true,
+                startup: { percent, completed: startup.completed, total: startup.total },
+            };
+        }
         return {
             tone: "starting",
             headline: "Starting LiveSync",

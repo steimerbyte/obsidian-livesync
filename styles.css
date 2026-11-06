@@ -459,6 +459,19 @@ span.ls-mark-cr::after {
     right: calc(env(safe-area-inset-right, 0px) + 12px);
 }
 
+.livesync-bubble.is-mobile .lsb-close {
+    width: 28px;
+    height: 28px;
+}
+
+.livesync-bubble.is-mobile .lsb-log-toggle {
+    min-height: 28px;
+}
+
+.livesync-bubble.is-mobile .lsb-action {
+    min-height: 34px;
+}
+
 .livesync-bubble.is-starting,
 .livesync-bubble.is-syncing {
     --lsb-tone: var(--interactive-accent);
@@ -495,9 +508,9 @@ span.ls-mark-cr::after {
     color: var(--lsb-tone);
     cursor: pointer;
     transition:
-        transform 160ms ease,
-        border-color 160ms ease,
-        box-shadow 160ms ease;
+        transform 140ms ease,
+        border-color 140ms ease,
+        box-shadow 140ms ease;
 }
 
 .livesync-bubble .lsb-orb {
@@ -505,22 +518,59 @@ span.ls-mark-cr::after {
 }
 
 .lsb-orb:hover {
-    transform: scale(1.06);
+    transform: translateY(-1px) scale(1.05);
     border-color: var(--lsb-tone);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.24);
 }
 
 .lsb-orb:active {
-    transform: scale(0.96);
+    transform: scale(0.94);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    transition-duration: 60ms;
 }
 
 .lsb-orb:focus-visible {
     outline: 2px solid var(--interactive-accent);
-    outline-offset: 3px;
+    outline-offset: 2px;
+    border-color: var(--lsb-tone);
 }
 
+/* Start-up percentage; outside the orb so it never covers the icon. */
+.lsb-startup-percent {
+    position: absolute;
+    top: -1px;
+    right: 100%;
+    box-sizing: border-box;
+    min-width: 22px;
+    margin-right: 5px;
+    padding: 1px 4px;
+    border: 1px solid var(--lsb-tone);
+    border-radius: 8px;
+    background: var(--background-primary);
+    color: var(--lsb-tone);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--font-semibold);
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.lsb-startup-percent[hidden] {
+    display: none;
+}
+
+.livesync-bubble.is-mobile .lsb-startup-percent {
+    font-size: 11px;
+}
+
+/* Pressed in while its card is open, so the orb reads as the card's handle. */
 .livesync-bubble.is-open .lsb-orb {
-    transform: scale(1.04);
+    transform: scale(0.96);
     border-color: var(--lsb-tone);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
 .lsb-icon {
@@ -540,64 +590,36 @@ span.ls-mark-cr::after {
 .lsb-ring,
 .lsb-progress-ring {
     position: absolute;
-    inset: -2px;
+    inset: -3px;
     border-radius: 50%;
+    opacity: 0;
     pointer-events: none;
     -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px));
     mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px));
 }
 
-.lsb-ring {
-    background: conic-gradient(from 0deg, transparent 0 62%, var(--lsb-tone) 82%, transparent 100%);
-    animation: lsb-orbit 3s linear infinite;
-}
-
-.livesync-bubble.is-syncing .lsb-ring {
-    animation-duration: 1.2s;
-}
-
-.livesync-bubble.is-starting .lsb-ring {
-    animation-duration: 4s;
-}
-
+/* Error only: three slow flashes when the state changes, then a still halo. */
 .livesync-bubble.is-error .lsb-ring {
-    animation-duration: 6s;
-    opacity: 0.8;
-}
-
-.livesync-bubble.is-paused .lsb-ring,
-.livesync-bubble.is-offline .lsb-ring {
-    animation-duration: 8s;
-    opacity: 0.55;
-}
-
-.lsb-progress-ring {
-    background: conic-gradient(
-        var(--lsb-tone) calc(var(--lsb-progress, 0) * 1%),
-        transparent calc(var(--lsb-progress, 0) * 1%)
-    );
+    background: var(--lsb-tone);
     opacity: 0.4;
+    animation: lsb-attention 1.4s ease-out 3;
+}
+
+/* Determinate arc while replicating; it steps with the one-second refresh. */
+.lsb-progress-ring {
+    background: conic-gradient(var(--lsb-tone) var(--lsb-progress-percent, 0%), transparent 0);
+    opacity: 0.85;
+}
+
+/* No measured total yet (boot without the progress store, or replication without sequence totals). */
+.lsb-progress-ring.is-indeterminate {
+    background: conic-gradient(var(--lsb-tone) 0 16%, transparent 16% 100%);
+    opacity: 0.7;
+    animation: lsb-breathe 1.8s ease-in-out infinite;
 }
 
 .lsb-progress-ring.is-hidden {
     display: none;
-}
-
-.lsb-pulse {
-    position: absolute;
-    right: 1px;
-    bottom: 2px;
-    width: 7px;
-    height: 7px;
-    border: 2px solid var(--background-primary);
-    border-radius: 50%;
-    background: var(--lsb-tone);
-    animation: lsb-pulse 2.6s ease-in-out infinite;
-}
-
-.livesync-bubble.is-starting .lsb-pulse,
-.livesync-bubble.is-syncing .lsb-pulse {
-    animation-duration: 1.4s;
 }
 
 .livesync-bubble.has-message .lsb-orb::after {
@@ -625,14 +647,17 @@ span.ls-mark-cr::after {
     border-radius: 14px;
     background: var(--background-primary);
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+    color: var(--text-normal);
     opacity: 0;
     visibility: hidden;
-    transform: translateY(-6px) scale(0.96);
+    transform: translateY(-6px) scale(0.97);
     transform-origin: top right;
     pointer-events: none;
+    /* Visibility is held until the fade ends, so closing animates instead of snapping. */
     transition:
-        opacity 160ms ease,
-        transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        opacity 150ms ease,
+        transform 190ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        visibility 0s linear 190ms;
 }
 
 .livesync-bubble.is-open .lsb-card {
@@ -640,6 +665,7 @@ span.ls-mark-cr::after {
     visibility: visible;
     transform: none;
     pointer-events: auto;
+    transition-delay: 0s;
 }
 
 .lsb-head {
@@ -661,7 +687,7 @@ span.ls-mark-cr::after {
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
     font-weight: var(--font-semibold);
-    letter-spacing: 0.02em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
 }
 
@@ -680,11 +706,19 @@ span.ls-mark-cr::after {
     font-size: 18px;
     line-height: 1;
     cursor: pointer;
+    transition:
+        background-color 120ms ease,
+        color 120ms ease;
 }
 
 .lsb-close:hover {
     background: var(--background-modifier-hover);
     color: var(--text-normal);
+}
+
+.lsb-close:focus-visible {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 1px;
 }
 
 .lsb-headline {
@@ -706,10 +740,10 @@ span.ls-mark-cr::after {
 }
 
 .lsb-bar {
-    height: 3px;
-    margin-top: 8px;
+    height: 4px;
+    margin-top: 9px;
     overflow: hidden;
-    border-radius: 999px;
+    border-radius: 2px;
     background: var(--background-modifier-border);
 }
 
@@ -717,25 +751,34 @@ span.ls-mark-cr::after {
     display: none;
 }
 
+/* Scale rather than width, so the one-second refresh re-composites instead of relaying out. */
 .lsb-bar-fill {
     display: block;
-    width: 0;
+    width: 100%;
     height: 100%;
     border-radius: inherit;
     background: var(--lsb-tone);
-    transition: width 300ms ease;
+    transform: scaleX(var(--lsb-progress-scale, 0));
+    transform-origin: left center;
+    transition: transform 320ms ease;
 }
 
 .lsb-categories {
     display: grid;
-    gap: 3px;
-    margin-top: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 10px;
+    row-gap: 4px;
+    margin-top: 10px;
+    padding-top: 9px;
+    border-top: 1px solid var(--background-modifier-border);
 }
 
 .lsb-category {
-    display: flex;
+    display: grid;
+    grid-template-columns: 8px minmax(0, 1fr);
     align-items: center;
     gap: 6px;
+    min-height: 16px;
 }
 
 .lsb-category.is-ok {
@@ -751,44 +794,117 @@ span.ls-mark-cr::after {
 }
 
 .lsb-category-dot {
-    flex: 0 0 auto;
-    width: 7px;
-    height: 7px;
+    justify-self: center;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     background: var(--lsb-category-tone, var(--text-faint));
+    opacity: 0.5;
+}
+
+.lsb-category.is-warn .lsb-category-dot {
+    opacity: 1;
+}
+
+/* Hollow, so a failure does not rely on colour alone. */
+.lsb-category.is-error .lsb-category-dot {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--lsb-category-tone);
+    opacity: 1;
 }
 
 .lsb-category-label {
+    overflow: hidden;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
-    line-height: 1.3;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lsb-category.is-warn .lsb-category-label {
+    color: var(--text-normal);
+}
+
+.lsb-category.is-error .lsb-category-label {
+    color: var(--text-normal);
+    font-weight: var(--font-medium);
+}
+
+/* Secondary surface: collapsed by default so the card stays a summary, not a console. */
+.lsb-log {
+    margin-top: 10px;
+    padding-top: 7px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.lsb-log[hidden] {
+    display: none;
+}
+
+.lsb-log-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-semibold);
+    line-height: 1.4;
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+}
+
+.lsb-log-toggle::-webkit-details-marker {
+    display: none;
+}
+
+.lsb-log-toggle::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 0;
+    height: 0;
+    border-left: 4px solid currentColor;
+    border-top: 3px solid transparent;
+    border-bottom: 3px solid transparent;
+    transition: transform 120ms ease;
+}
+
+.lsb-log[open] > .lsb-log-toggle {
+    color: var(--text-normal);
+}
+
+.lsb-log[open] > .lsb-log-toggle::before {
+    transform: rotate(90deg);
+}
+
+.lsb-log-toggle:focus-visible {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
 }
 
 .lsb-live-status {
     max-height: 9rem;
-    margin: 9px 0 0;
-    padding: 7px 9px;
+    margin: 6px 0 0;
+    padding: 6px 8px;
     overflow-y: auto;
-    border-radius: 4px;
+    border-radius: 6px;
     background: var(--background-secondary);
     color: var(--text-muted);
     font-family: var(--font-monospace);
     font-size: var(--font-ui-smaller);
-    line-height: 1.4;
+    line-height: 1.45;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     font-variant-numeric: tabular-nums;
 }
 
-.lsb-live-status[hidden] {
-    display: none;
-}
-
 .lsb-message {
-    margin-top: 9px;
-    padding: 7px 9px;
+    margin-top: 10px;
+    padding: 8px 10px;
     border-left: 2px solid var(--lsb-tone);
-    border-radius: 4px;
+    border-radius: 6px;
     background: var(--background-secondary);
 }
 
@@ -814,23 +930,30 @@ span.ls-mark-cr::after {
 }
 
 .lsb-actions {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     gap: 6px;
-    margin-top: 10px;
+    margin-top: 12px;
 }
 
 .lsb-action {
     height: auto;
-    padding: 5px 9px;
+    min-height: 28px;
+    padding: 4px 8px;
     border: 1px solid var(--background-modifier-border);
-    border-radius: 7px;
+    border-radius: 8px;
     background: var(--background-secondary);
     box-shadow: none;
     color: var(--text-normal);
     font-size: var(--font-ui-smaller);
+    font-weight: var(--font-medium);
     line-height: 1.2;
     cursor: pointer;
+    transition:
+        background-color 120ms ease,
+        border-color 120ms ease,
+        color 120ms ease;
 }
 
 .lsb-action:hover {
@@ -855,34 +978,47 @@ span.ls-mark-cr::after {
     outline-offset: 2px;
 }
 
-@keyframes lsb-orbit {
-    to {
-        transform: rotate(1turn);
-    }
-}
-
-@keyframes lsb-pulse {
+@keyframes lsb-breathe {
     0%,
     100% {
-        transform: scale(1);
-        opacity: 1;
+        opacity: 0.25;
     }
 
     50% {
-        transform: scale(1.18);
-        opacity: 0.65;
+        opacity: 0.9;
     }
 }
 
+@keyframes lsb-attention {
+    0% {
+        opacity: 0.9;
+        transform: scale(1);
+    }
+
+    55% {
+        opacity: 0.12;
+        transform: scale(1.14);
+    }
+
+    100% {
+        opacity: 0.4;
+        transform: scale(1);
+    }
+}
+
+/* Motion is never load-bearing, so the reduced-motion setting can flatten all of it. */
 @media (prefers-reduced-motion: reduce) {
-    .lsb-ring,
-    .lsb-pulse {
-        animation: none;
+    .livesync-bubble .lsb-ring,
+    .livesync-bubble .lsb-progress-ring {
+        animation: none !important;
     }
 
     .lsb-orb,
     .lsb-card,
-    .lsb-bar-fill {
+    .lsb-bar-fill,
+    .lsb-close,
+    .lsb-action,
+    .lsb-log-toggle::before {
         transition: none;
     }
 }

@@ -26,6 +26,7 @@ import { ModuleResolvingMismatchedTweaks } from "./modules/coreFeatures/ModuleRe
 import { ModuleLiveSyncMain } from "./modules/main/ModuleLiveSyncMain";
 import type { ServiceModules } from "@vrtmrz/livesync-commonlib/compat/interfaces/ServiceModule";
 import { usePrepareDatabaseForUse } from "@vrtmrz/livesync-commonlib/compat/serviceFeatures/prepareDatabaseForUse";
+import { useStartupProgressFeature } from "./serviceFeatures/startupProgress";
 import type { Constructor } from "@vrtmrz/livesync-commonlib/compat/common/utils.type";
 import { useReplicationScheduling, type ReplicationSchedulingControl } from "./serviceFeatures/replicationScheduling";
 import { createCentralReplicatorProviderDefinitions } from "./common/replicatorProviders";
@@ -300,6 +301,7 @@ export class LiveSyncBaseCore<
         useTargetFilters(this);
         // enable target filter feature.
         usePrepareDatabaseForUse(this);
+        useStartupProgressFeature(this);
         // Migration to multiple remote configurations
         useRemoteConfigurationMigration(this);
         return Object.freeze({
