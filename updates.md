@@ -12,6 +12,10 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+## 1.0.46
+
+6th November, 2026
+
 This is a fork release of Self-hosted LiveSync, maintained by steimerbyte. It follows upstream 1.0.45 without diverging from upstream behaviour, and adds bounds to the client hot paths which grew with Vault size and session length.
 
 ### Performance
