@@ -199,8 +199,19 @@ export class ObsidianAPIService extends InjectableAPIService<ObsidianServiceCont
         return this.context.plugin.addStatusBarItem();
     }
 
+    private noticeHandler: ((message: string, duration?: number) => void) | null = null;
+
+    /** Route plugin notices to the always-on status bubble when it is mounted. */
+    setNoticeHandler(handler: ((message: string, duration?: number) => void) | null): void {
+        this.noticeHandler = handler;
+    }
+
     /** Show a user-facing notice; not part of the shared service contract, used by optional UI helpers. */
     showNotice(message: string, duration = 5000): void {
+        if (this.noticeHandler) {
+            this.noticeHandler(message, duration);
+            return;
+        }
         new Notice(message, duration);
     }
 

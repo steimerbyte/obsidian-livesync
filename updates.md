@@ -12,6 +12,17 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+## 1.0.49
+
+6th November, 2026
+
+### Changed
+
+- Replaced the plugin's notice cards with one always-on status orb in the top-right corner: initialising, ready, syncing, configuration sync, paused, offline, and error states each have their own colour and icon.
+- The orb carries a continuously animated ring, a live progress arc during replication, and a small state dot; tapping it expands a compact card with the current headline, pull/push progress, queue counts, and the **Sync now**, **Log**, and **Settings** actions.
+- Plugin notices (manual-sync explanations, debug-info confirmation, governor status) now appear inside that card instead of as separate toasts or cards.
+- The card respects mobile safe areas, keyboard focus and Escape, and `prefers-reduced-motion`.
+
 ## 1.0.48
 
 6th November, 2026

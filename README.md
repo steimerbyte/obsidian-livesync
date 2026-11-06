@@ -118,9 +118,11 @@ If you would rather not set up and maintain a server yourself, the following pro
 
 Your synchronisation data will reside on a server operated by the provider. Consider whether that is acceptable for your Vault, and review the provider's current terms, pricing, and data-handling policies before using the service.
 
-## Information in the Status Bar
+## Status Bubble and Status Bar
 
-Synchronisation status is shown in the status bar and inside the editor by default. The main indicators are:
+A compact orb in the top-right of the active note shows the current LiveSync state — starting, ready, syncing, configuration sync, paused, offline, or error — with a continuously animated ring. Tap it to expand the live headline, pull/push progress, queue counts, and the **Sync now**, **Log**, and **Settings** actions. Plugin notices appear in this card instead of separate notice cards or toasts.
+
+Synchronisation status is also shown in the status bar and inside the editor by default. The main indicators are:
 
 | Indicator | Meaning |
 | --- | --- |

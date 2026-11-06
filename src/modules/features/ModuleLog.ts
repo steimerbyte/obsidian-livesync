@@ -45,7 +45,6 @@ import {
 } from "./StatusBarDisplay.ts";
 import { createFastForwardCheckedChangesDisplay, projectReplicationStatusLabel } from "./ReplicationStatusLabel.ts";
 import { createStatusBarRenderer, type StatusBarPart, type StatusBarRenderer } from "./StatusBarRenderer.ts";
-import { showNoticeCard } from "./NoticeCard.ts";
 import type { LiveSyncCore } from "@/main.ts";
 import { LiveSyncError } from "@vrtmrz/livesync-commonlib/compat/common/LSError";
 import { isValidPath } from "@/common/utils.ts";
@@ -66,6 +65,8 @@ import {
     ANDROID_LINUX_PATH_COMPONENT_UTF8_WARNING_BOUNDARY,
     findPathComponentsExceedingUtf8Limit,
 } from "@/common/pathCompatibility.ts";
+
+type NoticeCapableAPI = { showNotice?: (message: string, duration?: number) => void };
 
 // This module cannot be a core module because it depends on the Obsidian UI.
 
@@ -481,12 +482,9 @@ export class ModuleLog extends AbstractObsidianModule {
 ${stringifyYaml(info)}
 \`\`\`\``;
                 if (await this.services.UI.promptCopyToClipboard("Debug info", yaml)) {
-                    showNoticeCard("Debug info copied", (card) => {
-                        card.createDiv({
-                            cls: "livesync-notice-body",
-                            text: "Paste it into the issue. It may contain sensitive information, so review it before sharing.",
-                        });
-                    });
+                    (this.services.API as unknown as NoticeCapableAPI).showNotice?.(
+                        "Debug info copied. Paste it into the issue and review it for sensitive information first."
+                    );
                 }
             },
         });

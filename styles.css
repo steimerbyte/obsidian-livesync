@@ -446,67 +446,395 @@ span.ls-mark-cr::after {
     }
 }
 
-.livesync-notice {
+/* LiveSync status bubble: one always-on orb, expanding into the status card. */
+.livesync-bubble {
+    --lsb-tone: var(--text-muted);
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 84px);
+    right: calc(env(safe-area-inset-right, 0px) + 52px);
+    z-index: 60;
+    width: 44px;
+    height: 44px;
+    font-family: var(--font-interface);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.livesync-bubble.is-mobile {
+    top: calc(env(safe-area-inset-top, 0px) + 60px);
+    right: calc(env(safe-area-inset-right, 0px) + 12px);
+}
+
+.livesync-bubble.is-starting {
+    --lsb-tone: var(--color-yellow, #d9a441);
+}
+
+.livesync-bubble.is-ready {
+    --lsb-tone: var(--color-green, #4caf50);
+}
+
+.livesync-bubble.is-syncing {
+    --lsb-tone: var(--interactive-accent);
+}
+
+.livesync-bubble.is-config {
+    --lsb-tone: var(--color-purple, #a882ff);
+}
+
+.livesync-bubble.is-error {
+    --lsb-tone: var(--color-red, #e05252);
+}
+
+.livesync-bubble.is-paused,
+.livesync-bubble.is-offline {
+    --lsb-tone: var(--text-muted);
+}
+
+.lsb-orb {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 50%;
+    background: var(--background-primary);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+    color: var(--lsb-tone);
+    cursor: pointer;
+    transition:
+        transform 160ms ease,
+        border-color 160ms ease,
+        box-shadow 160ms ease;
+}
+
+.livesync-bubble .lsb-orb {
+    color: var(--lsb-tone);
+}
+
+.lsb-orb:hover {
+    transform: scale(1.06);
+    border-color: var(--lsb-tone);
+}
+
+.lsb-orb:active {
+    transform: scale(0.96);
+}
+
+.lsb-orb:focus-visible {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 3px;
+}
+
+.livesync-bubble.is-open .lsb-orb {
+    transform: scale(1.04);
+    border-color: var(--lsb-tone);
+}
+
+.lsb-icon {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    pointer-events: none;
+}
+
+.lsb-icon svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 1.8;
+}
+
+.lsb-ring,
+.lsb-progress-ring {
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    pointer-events: none;
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 1.5px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 1.5px));
+}
+
+.lsb-ring {
+    background: conic-gradient(from 0deg, transparent 0 62%, var(--lsb-tone) 82%, transparent 100%);
+    animation: lsb-orbit 3s linear infinite;
+}
+
+.livesync-bubble.is-syncing .lsb-ring {
+    animation-duration: 1.2s;
+}
+
+.livesync-bubble.is-starting .lsb-ring {
+    animation-duration: 4s;
+}
+
+.livesync-bubble.is-error .lsb-ring {
+    animation-duration: 6s;
+    opacity: 0.8;
+}
+
+.livesync-bubble.is-paused .lsb-ring,
+.livesync-bubble.is-offline .lsb-ring {
+    animation-duration: 8s;
+    opacity: 0.55;
+}
+
+.lsb-progress-ring {
+    background: conic-gradient(
+        var(--lsb-tone) calc(var(--lsb-progress, 0) * 1%),
+        transparent calc(var(--lsb-progress, 0) * 1%)
+    );
+    opacity: 0.4;
+}
+
+.lsb-progress-ring.is-hidden {
+    display: none;
+}
+
+.lsb-pulse {
+    position: absolute;
+    right: 2px;
+    bottom: 3px;
+    width: 8px;
+    height: 8px;
+    border: 2px solid var(--background-primary);
+    border-radius: 50%;
+    background: var(--lsb-tone);
+    animation: lsb-pulse 2.6s ease-in-out infinite;
+}
+
+.livesync-bubble.is-starting .lsb-pulse,
+.livesync-bubble.is-syncing .lsb-pulse {
+    animation-duration: 1.4s;
+}
+
+.livesync-bubble.has-message .lsb-orb::after {
+    content: "";
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 8px;
+    height: 8px;
+    border: 2px solid var(--background-primary);
+    border-radius: 50%;
+    background: var(--interactive-accent);
+}
+
+.lsb-card {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    box-sizing: border-box;
+    width: min(20rem, calc(100vw - 1.5rem));
+    max-height: min(70vh, 32rem);
+    overflow-y: auto;
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 14px;
+    background: var(--background-primary);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px) scale(0.96);
+    transform-origin: top right;
+    pointer-events: none;
+    transition:
+        opacity 160ms ease,
+        transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.livesync-bubble.is-open .lsb-card {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    pointer-events: auto;
+}
+
+.lsb-head {
     display: flex;
-    flex-direction: column;
-    gap: var(--size-4-2);
-    min-width: min(15rem, 100%);
-    max-width: min(24rem, calc(100vw - 3rem));
-    line-height: 1.5;
-    text-align: start;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 8px;
+}
+
+.lsb-state-dot {
+    flex: 0 0 auto;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--lsb-tone);
+}
+
+.lsb-brand {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-semibold);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.lsb-close {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    margin-left: auto;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-muted);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.lsb-close:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.lsb-headline {
+    color: var(--text-normal);
+    font-size: var(--font-ui-medium);
+    font-weight: var(--font-semibold);
+    line-height: 1.3;
+}
+
+.lsb-detail {
+    max-height: 4.4em;
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
 }
 
-.livesync-notice-title {
+.lsb-bar {
+    height: 3px;
+    margin-top: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--background-modifier-border);
+}
+
+.lsb-bar[hidden] {
+    display: none;
+}
+
+.lsb-bar-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--lsb-tone);
+    transition: width 300ms ease;
+}
+
+.lsb-message {
+    margin-top: 9px;
+    padding: 7px 9px;
+    border-left: 2px solid var(--lsb-tone);
+    border-radius: 4px;
+    background: var(--background-secondary);
+}
+
+.lsb-message[hidden] {
+    display: none;
+}
+
+.lsb-message-title {
     color: var(--text-normal);
-    font-size: var(--font-ui-small);
+    font-size: var(--font-ui-smaller);
     font-weight: var(--font-semibold);
 }
 
-.livesync-notice-meta,
-.livesync-notice-body {
+.lsb-message-body {
+    max-height: 9rem;
+    margin-top: 2px;
+    overflow-y: auto;
     color: var(--text-muted);
     font-size: var(--font-ui-smaller);
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
-.livesync-notice-meta {
-    font-variant-numeric: tabular-nums;
+.lsb-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
 }
 
-.livesync-notice-state {
-    font-weight: var(--font-semibold);
+.lsb-action {
+    height: auto;
+    padding: 5px 9px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 7px;
+    background: var(--background-secondary);
+    box-shadow: none;
+    color: var(--text-normal);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.2;
+    cursor: pointer;
 }
 
-.livesync-notice-state.is-enabled {
+.lsb-action:hover {
+    border-color: var(--interactive-accent);
     color: var(--text-accent);
 }
 
-.livesync-notice-state.is-disabled {
-    color: var(--text-muted);
+.lsb-action.is-primary {
+    border-color: var(--interactive-accent);
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
 }
 
-.livesync-notice-grid {
-    display: grid;
-    grid-template-columns: max-content repeat(3, max-content);
-    justify-content: space-between;
-    align-items: baseline;
-    column-gap: var(--size-4-2);
-    font-size: var(--font-ui-smaller);
-    font-variant-numeric: tabular-nums;
+.lsb-action.is-primary:hover {
+    border-color: var(--interactive-accent-hover);
+    background: var(--interactive-accent-hover);
+    color: var(--text-on-accent);
 }
 
-.livesync-notice-column,
-.livesync-notice-label {
-    color: var(--text-muted);
+.lsb-action:focus-visible {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 2px;
 }
 
-.livesync-notice-column,
-.livesync-notice-value {
-    text-align: end;
+@keyframes lsb-orbit {
+    to {
+        transform: rotate(1turn);
+    }
 }
 
-.livesync-notice-value {
-    color: var(--text-normal);
+@keyframes lsb-pulse {
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.18);
+        opacity: 0.65;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lsb-ring,
+    .lsb-pulse {
+        animation: none;
+    }
+
+    .lsb-orb,
+    .lsb-card,
+    .lsb-bar-fill {
+        transition: none;
+    }
 }
 
 /* Inline action in a persistent notice; keeps native button keyboard behaviour. */
