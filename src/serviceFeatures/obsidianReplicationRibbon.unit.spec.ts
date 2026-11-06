@@ -24,6 +24,7 @@ describe("useObsidianReplicationRibbonFeature", () => {
             services: {
                 API: { addRibbonIcon },
                 appLifecycle: {
+                    isReady: () => true,
                     onInitialise: {
                         addHandler: vi.fn((handler: () => Promise<unknown>) => {
                             initialise = handler;

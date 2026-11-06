@@ -37,6 +37,7 @@ function createFixture() {
                     initialiseHandlers.push(handler);
                 }),
             },
+            isReady: vi.fn(() => true),
             isSuspended: vi.fn(() => false),
             setSuspended: vi.fn(),
         },
@@ -128,7 +129,7 @@ describe("useBasicCommandsFeature", () => {
         expect(fixture.getCommand("livesync-abortsync").name).toBe("Abort synchronization immediately");
     });
 
-    it("retains the manual replication authority and quiet progress presentation", async () => {
+    it("starts a manual replication with visible progress", async () => {
         const fixture = createFixture();
         await initialise(fixture);
 
@@ -136,7 +137,7 @@ describe("useBasicCommandsFeature", () => {
 
         expect(fixture.services.replication.replicateUserInitiated).toHaveBeenCalledWith({
             trigger: "manual",
-            progressPresentation: REPLICATION_PROGRESS_PRESENTATIONS.QUIET,
+            progressPresentation: REPLICATION_PROGRESS_PRESENTATIONS.NOTICE,
             interaction: USER_INITIATED_REPLICATION_AUTHORITY,
         });
     });

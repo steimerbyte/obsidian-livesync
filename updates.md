@@ -12,6 +12,15 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+## 1.0.48
+
+6th November, 2026
+
+### Fixed
+
+- Manual sync now explains why it did not start instead of failing silently: LiveSync still initialising, another sync already running, replication service not ready, no remote configured, rate limited, failed, partial, or cancelled.
+- The `Sync now` command now uses the visible notice progress presentation instead of quiet mode.
+
 ## 1.0.47
 
 6th November, 2026

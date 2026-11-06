@@ -1,6 +1,6 @@
 import { InjectableAPIService } from "@vrtmrz/livesync-commonlib/compat/services/implements/injectable/InjectableAPIService";
 import type { ObsidianServiceContext } from "@/modules/services/ObsidianServiceContext";
-import { Platform, type Command, type ViewCreator } from "@/deps.ts";
+import { Notice, Platform, type Command, type ViewCreator } from "@/deps.ts";
 import { ObsHttpHandler } from "@/modules/essentialObsidian/APILib/ObsHttpHandler";
 import { ObsidianConfirm } from "./ObsidianConfirm";
 import type { Confirm } from "@vrtmrz/livesync-commonlib/compat/interfaces/Confirm";
@@ -197,6 +197,11 @@ export class ObsidianAPIService extends InjectableAPIService<ObsidianServiceCont
 
     override addStatusBarItem(): HTMLElement | undefined {
         return this.context.plugin.addStatusBarItem();
+    }
+
+    /** Show a user-facing notice; not part of the shared service contract, used by optional UI helpers. */
+    showNotice(message: string, duration = 5000): void {
+        new Notice(message, duration);
     }
 
     override setInterval(handler: () => void, timeout: number): number {

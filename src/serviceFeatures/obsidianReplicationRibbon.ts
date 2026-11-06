@@ -1,10 +1,7 @@
 import { addIcon } from "@/deps.ts";
 import { $msg } from "@/common/translation";
 import type { NecessaryServices } from "@vrtmrz/livesync-commonlib/compat/interfaces/ServiceModule";
-import {
-    REPLICATION_PROGRESS_PRESENTATIONS,
-    USER_INITIATED_REPLICATION_AUTHORITY,
-} from "@vrtmrz/livesync-commonlib/replication";
+import { requestUserInitiatedReplication } from "@/serviceFeatures/manualReplication";
 
 export type ObsidianReplicationRibbonHost = NecessaryServices<"API" | "appLifecycle" | "replication", never>;
 
@@ -29,11 +26,7 @@ export function useObsidianReplicationRibbonFeature(host: ObsidianReplicationRib
         addIcon("replicate", REPLICATE_ICON_SVG);
 
         services.API.addRibbonIcon("replicate", $msg("moduleObsidianMenu.replicate"), async () => {
-            await services.replication.replicateUserInitiated({
-                trigger: "manual",
-                progressPresentation: REPLICATION_PROGRESS_PRESENTATIONS.NOTICE,
-                interaction: USER_INITIATED_REPLICATION_AUTHORITY,
-            });
+            await requestUserInitiatedReplication(services);
         }).addClass("livesync-ribbon-replicate");
 
         return Promise.resolve(true);

@@ -3,12 +3,9 @@ import { LOG_LEVEL_NOTICE } from "octagonal-wheels/common/logger";
 import { fireAndForget } from "octagonal-wheels/promises";
 import type { NecessaryServices } from "@vrtmrz/livesync-commonlib/compat/interfaces/ServiceModule";
 import { createInstanceLogFunction } from "@vrtmrz/livesync-commonlib/compat/services/lib/logUtils";
-import {
-    REPLICATION_PROGRESS_PRESENTATIONS,
-    USER_INITIATED_REPLICATION_AUTHORITY,
-} from "@vrtmrz/livesync-commonlib/replication";
 import { $msg } from "@/common/translation";
 import { copyFileDatabaseInfo, type FileDatabaseInfoCore } from "@/serviceFeatures/fileDatabaseInfo";
+import { requestUserInitiatedReplication } from "@/serviceFeatures/manualReplication";
 
 /**
  * Services required by the platform-independent command palette actions.
@@ -59,11 +56,7 @@ export function useBasicCommandsFeature(host: BasicCommandsHost): void {
             id: "livesync-replicate",
             name: $msg("Sync now"),
             callback: async () => {
-                await services.replication.replicateUserInitiated({
-                    trigger: "manual",
-                    progressPresentation: REPLICATION_PROGRESS_PRESENTATIONS.QUIET,
-                    interaction: USER_INITIATED_REPLICATION_AUTHORITY,
-                });
+                await requestUserInitiatedReplication(services);
             },
         });
 
