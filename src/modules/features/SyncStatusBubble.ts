@@ -216,8 +216,9 @@ export class SyncStatusBubble {
         const rect = view?.getBoundingClientRect();
         if (!rect || rect.width <= 0) return;
         const margin = Platform.isMobile ? 12 : 52;
+        const top = Platform.isMobile ? Math.max(60, rect.top + 12) : Math.max(12, rect.top + 12);
         this.root.style.left = `${Math.max(8, Math.round(rect.right - 44 - margin))}px`;
-        this.root.style.top = `${Math.round(rect.top + 12)}px`;
+        this.root.style.top = `${Math.round(top)}px`;
         this.root.style.right = "auto";
     }
 

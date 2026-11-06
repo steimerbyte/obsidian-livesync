@@ -12,6 +12,14 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+## 1.0.50
+
+6th November, 2026
+
+### Fixed
+
+- On mobile, the status orb keeps a minimum top offset below the safe area, so anchoring it to the active note cannot place it under the status bar or mobile header.
+
 ## 1.0.49
 
 6th November, 2026
