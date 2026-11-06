@@ -134,6 +134,55 @@ See the [status display guide](docs/tips/status-display.md) for detailed progres
 
 Allow pending file operations to finish before closing Obsidian, especially after deleting or renaming files.
 
+## Performance and Resource Usage
+
+This fork contains client-side work to reduce memory growth and CPU load, particularly on mobile devices where Obsidian has a smaller memory budget. The changes do not alter the synchronisation protocol, the remote database format, or the settings schema, and add no dependencies.
+
+Measured on a local production build (`npm run build`, `gzip -6 main.js`):
+
+| Metric | Before | After | Change |
+| --- | ---: | ---: | ---: |
+| `main.js` | 4,089,451 B | 4,023,006 B | −1.62 % |
+| `main.js` (gzip) | 1,161,862 B | 1,146,295 B | −1.34 % |
+| Unit tests | 2,041 passed | 2,069 passed | — |
+
+### Memory
+
+- The on-editor log history is only collected while "Show longer log" is enabled, and is capped at 200 entries. Previously it grew for the whole session even when the history was not displayed.
+- The replication result queue is keyed by document id in a `Map`, so re-queuing and removal are constant-time instead of scanning an array. Recovery snapshots are written at most once per second and are skipped when the queue is empty.
+- The startup integrity check skips documents that are already deleted, reuses the blob it has built instead of reading the same content twice, and yields to the event loop every 128 documents.
+- The same-change pair cache is capped at 4,096 entries with oldest-first eviction, which bounds the whole-map local storage write.
+- Local database maintenance reads and deletes chunk documents in batches of 100; the database-wide garbage collection holds a lock for its whole run, and local PouchDB compaction runs once after the user-confirmed collection.
+
+### Synchronisation and background work
+
+- Hidden File Sync and Config Sync sweeps pause while the application is suspended, and resume with the existing on-resume scan.
+- Hidden File Sync caps concurrent stat calls and batch items at 10, and merges untracked-file sets with a `Set` instead of repeated `indexOf` scans.
+- Database file enumeration reads the metadata range in pages of 1,000 rows rather than one response containing the whole vault.
+- Config Sync reads its legacy (V1) range as a stream instead of materialising every document body.
+- Conflict checking runs at most two checks concurrently. Each check can hold several full note bodies, so this is a memory bound rather than a throughput setting.
+- Conflict state is only refreshed for the active file or a postponed conflict. Other checked files no longer trigger a metadata read and a global status event each.
+
+### CPU and rendering
+
+- The in-editor status overlay re-renders at most every 250 ms on mobile (20 ms on desktop) instead of 50 times per second.
+- Document History debounces revision slider input by 275 ms, so dragging produces one diff instead of one per input event.
+- The status overlay no longer applies a grayscale filter, the sticky settings header uses an opaque background instead of a backdrop blur, and the warning band no longer runs an infinite background animation.
+
+### Build
+
+- Production compression runs two Terser passes. Class and function names, property names, and top-level bindings remain unmangled because the plug-in uses `constructor.name` for add-on discovery and diagnostic labels.
+
+### Remaining upstream work
+
+The following costs live in `@vrtmrz/livesync-commonlib` and are not changed by this fork:
+
+- The chunk cache performs a linear content scan per chunk unless an independent encryption key is configured.
+- `allChunks()` materialises every chunk body at once during local garbage collection.
+- The chunk worker pool starts `floor(hardwareConcurrency / 2)` workers when the plug-in loads.
+- Content comparisons materialise both sides as whole-file `ArrayBuffer` copies.
+- The target-file filter cache is invalidated by every storage event.
+
 ## Tips and Troubleshooting
 - If you want a faster and simpler initial replication when setting up subsequent devices, see the [Fast Setup Guide](docs/tips/fast-setup.md).
 - Configure [Hidden File Sync](docs/tips/hidden-file-sync.md) only after ordinary note synchronisation works.
