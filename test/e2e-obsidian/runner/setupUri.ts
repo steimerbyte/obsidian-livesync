@@ -494,7 +494,7 @@ export async function resumeCompatibilityReviewIfShown(port: number): Promise<bo
             if (await modal.isVisible()) return true;
             const reminder = page.locator(".notice.livesync-compatibility-review-notice");
             if (!(await reminder.isVisible())) return false;
-            await reminder.getByRole("link", { name: "Review why" }).click({ timeout: uiTimeoutMs });
+            await reminder.getByRole("button", { name: "Review why" }).click({ timeout: uiTimeoutMs });
             await modal.waitFor({ state: "visible", timeout: uiTimeoutMs });
             return true;
         }).catch(() => false);

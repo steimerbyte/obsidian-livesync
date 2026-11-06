@@ -446,6 +446,89 @@ span.ls-mark-cr::after {
     }
 }
 
+.livesync-notice {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-2);
+    min-width: min(15rem, 100%);
+    max-width: min(24rem, calc(100vw - 3rem));
+    line-height: 1.5;
+    text-align: start;
+    overflow-wrap: anywhere;
+}
+
+.livesync-notice-title {
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    font-weight: var(--font-semibold);
+}
+
+.livesync-notice-meta,
+.livesync-notice-body {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.livesync-notice-meta {
+    font-variant-numeric: tabular-nums;
+}
+
+.livesync-notice-state {
+    font-weight: var(--font-semibold);
+}
+
+.livesync-notice-state.is-enabled {
+    color: var(--text-accent);
+}
+
+.livesync-notice-state.is-disabled {
+    color: var(--text-muted);
+}
+
+.livesync-notice-grid {
+    display: grid;
+    grid-template-columns: max-content repeat(3, max-content);
+    justify-content: space-between;
+    align-items: baseline;
+    column-gap: var(--size-4-2);
+    font-size: var(--font-ui-smaller);
+    font-variant-numeric: tabular-nums;
+}
+
+.livesync-notice-column,
+.livesync-notice-label {
+    color: var(--text-muted);
+}
+
+.livesync-notice-column,
+.livesync-notice-value {
+    text-align: end;
+}
+
+.livesync-notice-value {
+    color: var(--text-normal);
+}
+
+/* Inline action in a persistent notice; keeps native button keyboard behaviour. */
+.livesync-notice-action {
+    display: inline-block;
+    height: auto;
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+    color: var(--text-accent);
+    font: inherit;
+    line-height: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+}
+
+.livesync-notice-action:hover {
+    color: var(--text-accent-hover);
+}
+
 .livesync-status {
     user-select: none;
     pointer-events: none;
@@ -492,13 +575,14 @@ div.workspace-leaf-content[data-type="bases"] .livesync-status {
     );
 }
 
+/* Quiet by colour rather than opacity, so the text keeps the theme's contrast. */
 .livesync-status div {
-    opacity: 0.6;
+    color: var(--text-muted);
 }
 
 .livesync-status .livesync-status-loghistory {
     text-align: left;
-    opacity: 0.4;
+    color: var(--text-faint);
 }
 
 .livesync-status div.livesync-status-messagearea:empty {
@@ -506,12 +590,15 @@ div.workspace-leaf-content[data-type="bases"] .livesync-status {
 }
 
 .livesync-status div.livesync-status-messagearea:not(:empty) {
-    opacity: 0.6;
-    color: var(--text-on-accent);
+    color: var(--text-error);
     border: 1px solid var(--background-modifier-error);
     background-color: rgba(var(--background-modifier-error-rgb), 0.2);
+    border-radius: var(--radius-s);
+    padding: var(--size-4-1) var(--size-4-2);
     width: fit-content;
+    max-width: 100%;
     margin-left: auto;
+    overflow-wrap: anywhere;
 }
 
 .menu-setting-poweruser-disabled .sls-setting-poweruser {
@@ -582,6 +669,13 @@ body.is-mobile .livesync-message-box-container button {
     height: auto;
     min-height: var(--input-height);
     white-space: normal;
+}
+
+/* Persistent notices stay narrow enough to read at a glance and to fit a phone screen. */
+.livesync-compatibility-review-notice,
+.livesync-language-applied-notice {
+    max-width: min(26rem, calc(100vw - 3rem));
+    line-height: 1.5;
 }
 
 body.is-mobile .livesync-compatibility-review-notice {

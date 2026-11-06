@@ -16,6 +16,7 @@ import { ConfigSync } from "./features/ConfigSync/CmdConfigSync.ts";
 // import { ModuleDev } from "./modules/extras/ModuleDev.ts";
 
 import { ModuleLog } from "./modules/features/ModuleLog.ts";
+import { showNoticeCard } from "./modules/features/NoticeCard.ts";
 import { withOwnedResource } from "octagonal-wheels/resource";
 import { ModuleObsidianEvents } from "./modules/essentialObsidian/ModuleObsidianEvents.ts";
 import { ModuleObsidianSettingDialogue } from "./modules/features/ModuleObsidianSettingTab.ts";
@@ -67,21 +68,36 @@ import { useDatabaseDiagnosticsFeature } from "./serviceFeatures/useDatabaseDiag
 export type LiveSyncCore = LiveSyncBaseCore<ObsidianServiceContext, LiveSyncCommands>;
 
 /**
- * Renders the governor's own view of itself. The level and the effective limits together are the
- * active profile, since the governor has no separate profile setting.
+ * Shows the governor's own view of itself as a compact card. The level and the effective limits
+ * together are the active profile, since the governor has no separate profile setting.
  */
-function describeGovernorStatus(): string {
+function showGovernorStatus(): void {
     const snapshot = getGovernorSnapshot();
     const { limits, inFlight, queued } = snapshot;
     // A zero background limit means background work is paused, not that the limit is missing.
-    const backgroundLimit = limits.background === 0 ? "background paused" : `${limits.background} background`;
-    return [
-        `RAM/CPU optimiser: ${snapshot.enabled ? "enabled" : "disabled"}`,
-        `Level: ${snapshot.level} (pressure ${Math.round(snapshot.pressure * 100)} %)`,
-        `In flight: ${inFlight.user} user / ${inFlight.interactive} interactive / ${inFlight.background} background`,
-        `Queued: ${queued.user} user / ${queued.interactive} interactive / ${queued.background} background`,
-        `Limits: ${limits.user} user / ${limits.interactive} interactive / ${backgroundLimit}`,
-    ].join("\n");
+    const backgroundLimit = limits.background === 0 ? "paused" : String(limits.background);
+    showNoticeCard("RAM/CPU optimiser", (card) => {
+        const headline = card.createDiv({ cls: "livesync-notice-meta" });
+        headline.createSpan({
+            cls: `livesync-notice-state ${snapshot.enabled ? "is-enabled" : "is-disabled"}`,
+            text: snapshot.enabled ? "Enabled" : "Disabled",
+        });
+        headline.createSpan({ text: ` · level ${snapshot.level} · pressure ${Math.round(snapshot.pressure * 100)} %` });
+
+        const grid = card.createDiv({ cls: "livesync-notice-grid" });
+        for (const column of ["", "running", "queued", "limit"]) {
+            grid.createSpan({ cls: "livesync-notice-column", text: column });
+        }
+        const addRow = (label: string, running: number, waiting: number, limit: number | string) => {
+            grid.createSpan({ cls: "livesync-notice-label", text: label });
+            for (const value of [running, waiting, limit]) {
+                grid.createSpan({ cls: "livesync-notice-value", text: String(value) });
+            }
+        };
+        addRow("user", inFlight.user, queued.user, limits.user);
+        addRow("interactive", inFlight.interactive, queued.interactive, limits.interactive);
+        addRow("background", inFlight.background, queued.background, backgroundLimit);
+    });
 }
 
 export default class ObsidianLiveSyncPlugin extends Plugin {
@@ -280,7 +296,7 @@ export default class ObsidianLiveSyncPlugin extends Plugin {
             id: "resource-governor-status",
             name: "Show RAM/CPU optimiser status",
             callback: () => {
-                new Notice(describeGovernorStatus());
+                showGovernorStatus();
             },
         });
         void this._startUp();

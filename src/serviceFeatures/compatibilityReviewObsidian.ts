@@ -54,21 +54,18 @@ export class ObsidianCompatibilityReviewUi implements CompatibilityReviewUi {
 
     showReminder(openReview: () => void): void {
         this.clearReminder();
-        let reminderAnchor: HTMLAnchorElement | undefined;
+        let reminderAction: HTMLButtonElement | undefined;
         const fragment = createFragment((documentFragment) => {
-            documentFragment.createSpan({
-                text: "Self-hosted LiveSync has paused remote synchronisation for compatibility review. ",
-            });
-            documentFragment.createEl("a", { text: "Review why" }, (anchor) => {
-                reminderAnchor = anchor;
-                anchor.addEventListener("click", (event) => {
-                    event.preventDefault();
+            documentFragment.createSpan({ text: "Synchronisation paused for compatibility review. " });
+            documentFragment.createEl("button", { cls: "livesync-notice-action", text: "Review why" }, (button) => {
+                reminderAction = button;
+                button.addEventListener("click", () => {
                     openReview();
                 });
             });
         });
         this.reminder = new Notice(fragment, 0);
-        reminderAnchor?.closest<HTMLElement>(".notice")?.classList.add("livesync-compatibility-review-notice");
+        reminderAction?.closest<HTMLElement>(".notice")?.classList.add("livesync-compatibility-review-notice");
     }
 
     clearReminder(): void {

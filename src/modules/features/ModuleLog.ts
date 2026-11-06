@@ -31,7 +31,7 @@ import {
     eventHub,
 } from "@/common/events.ts";
 import { AbstractObsidianModule } from "@/modules/AbstractObsidianModule.ts";
-import { addIcon, debounce, normalizePath, Notice, stringifyYaml, type WorkspaceLeaf } from "@/deps.ts";
+import { addIcon, debounce, normalizePath, stringifyYaml, type WorkspaceLeaf } from "@/deps.ts";
 import { LOG_LEVEL_NOTICE, setGlobalLogFunction } from "octagonal-wheels/common/logger";
 import { LogPaneView, VIEW_TYPE_LOG } from "./Log/LogPaneView.ts";
 import { withLock } from "octagonal-wheels/concurrency/lock";
@@ -45,6 +45,7 @@ import {
 } from "./StatusBarDisplay.ts";
 import { createFastForwardCheckedChangesDisplay, projectReplicationStatusLabel } from "./ReplicationStatusLabel.ts";
 import { createStatusBarRenderer, type StatusBarPart, type StatusBarRenderer } from "./StatusBarRenderer.ts";
+import { showNoticeCard } from "./NoticeCard.ts";
 import type { LiveSyncCore } from "@/main.ts";
 import { LiveSyncError } from "@vrtmrz/livesync-commonlib/compat/common/LSError";
 import { isValidPath } from "@/common/utils.ts";
@@ -480,9 +481,12 @@ export class ModuleLog extends AbstractObsidianModule {
 ${stringifyYaml(info)}
 \`\`\`\``;
                 if (await this.services.UI.promptCopyToClipboard("Debug info", yaml)) {
-                    new Notice(
-                        "Debug info copied to clipboard. You can paste it in the issue. Be careful as it may contain sensitive information, review it before sharing."
-                    );
+                    showNoticeCard("Debug info copied", (card) => {
+                        card.createDiv({
+                            cls: "livesync-notice-body",
+                            text: "Paste it into the issue. It may contain sensitive information, so review it before sharing.",
+                        });
+                    });
                 }
             },
         });
@@ -502,10 +506,24 @@ ${stringifyYaml(info)}
 
         if (this.settings.showStatusOnEditor) {
             this.statusDiv = this.app.workspace.containerEl.createDiv({ cls: "livesync-status" });
-            this.statusLine = this.statusDiv.createDiv({ cls: "livesync-status-statusline" });
-            this.messageArea = this.statusDiv.createDiv({ cls: "livesync-status-messagearea" });
-            this.logMessage = this.statusDiv.createDiv({ cls: "livesync-status-logmessage" });
-            this.logHistory = this.statusDiv.createDiv({ cls: "livesync-status-loghistory" });
+            // The counters and the rolling log line are decoration for sighted users; only the
+            // warnings in the message area are worth announcing.
+            this.statusLine = this.statusDiv.createDiv({
+                cls: "livesync-status-statusline",
+                attr: { "aria-hidden": "true" },
+            });
+            this.messageArea = this.statusDiv.createDiv({
+                cls: "livesync-status-messagearea",
+                attr: { role: "status" },
+            });
+            this.logMessage = this.statusDiv.createDiv({
+                cls: "livesync-status-logmessage",
+                attr: { "aria-hidden": "true" },
+            });
+            this.logHistory = this.statusDiv.createDiv({
+                cls: "livesync-status-loghistory",
+                attr: { "aria-hidden": "true" },
+            });
             this.statusDiv.setCssStyles({ display: this.settings?.showStatusOnEditor ? "" : "none" });
         }
         eventHub.onEvent(EVENT_LAYOUT_READY, () => this.adjustStatusDivPosition());

@@ -23,7 +23,7 @@ class ObsidianLanguageAppliedNotice {
 
     show(openDetails: () => void): void {
         this.clear();
-        let reminderAnchor: HTMLAnchorElement | undefined;
+        let reminderAction: HTMLButtonElement | undefined;
         const appliedMessage =
             $msg("dialog.yourLanguageAvailable")
                 .split(/\r?\n\s*\r?\n/u, 1)[0]
@@ -32,17 +32,20 @@ class ObsidianLanguageAppliedNotice {
             documentFragment.createSpan({
                 text: `${appliedMessage} `,
             });
-            documentFragment.createEl("a", { text: $msg("Open the dialog") }, (anchor) => {
-                reminderAnchor = anchor;
-                anchor.addEventListener("click", (event) => {
-                    event.preventDefault();
-                    this.clear();
-                    openDetails();
-                });
-            });
+            documentFragment.createEl(
+                "button",
+                { cls: "livesync-notice-action", text: $msg("Open the dialog") },
+                (button) => {
+                    reminderAction = button;
+                    button.addEventListener("click", () => {
+                        this.clear();
+                        openDetails();
+                    });
+                }
+            );
         });
         this.reminder = new Notice(fragment, 0);
-        reminderAnchor?.closest<HTMLElement>(".notice")?.classList.add("livesync-language-applied-notice");
+        reminderAction?.closest<HTMLElement>(".notice")?.classList.add("livesync-language-applied-notice");
     }
 
     clear(): void {

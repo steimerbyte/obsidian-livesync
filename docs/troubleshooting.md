@@ -82,7 +82,7 @@ If the recorded body is unavailable and no matching content evidence exists, Liv
 
 A compatibility review is separate from the Change Log. It can appear after an internal database or settings-format change, when the saved version marker is invalid, or when an earlier review remains pending. Adding a device or opening a copied Vault with no device-local acknowledgement does not itself trigger a review. A pause already saved by an earlier release still needs the explicit resume action, because the saved message does not identify its original cause.
 
-The **Synchronisation paused for compatibility review** dialogue opens after the Obsidian layout is ready. If it has been closed, use the persistent Notice's **Review why** link, or run `Review why synchronisation is paused` from the command palette. Opening **Change Log** does not clear the pause.
+The **Synchronisation paused for compatibility review** dialogue opens after the Obsidian layout is ready. If it has been closed, use the persistent Notice's **Review why** button, or run `Review why synchronisation is paused` from the command palette. Opening **Change Log** does not clear the pause.
 
 Review the stated reason before continuing. When **Resume synchronisation** is available, first update every synchronising device, then use that action to record the current internal database version and restore the configured synchronisation behaviour. If the action is unavailable, the running installation is older than the recorded database or settings format. Update that installation instead of resetting the database merely to remove the warning.
 
