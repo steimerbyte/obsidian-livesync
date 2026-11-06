@@ -12,6 +12,32 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+## 1.0.46
+
+6th November, 2026
+
+This is a fork release of Self-hosted LiveSync, maintained by steimerbyte. It follows upstream 1.0.45 without diverging from upstream behaviour, and adds bounds to the client hot paths which grew with Vault size and session length.
+
+### Performance
+
+#### Changed
+
+- Long sessions hold less memory and use less CPU, both while idle and while scanning.
+    - The on-editor log history is limited to the 200 most recent entries, and is collected only while **Show longer log inside the editor** is enabled.
+    - On mobile, the editor status bar repaints at most four times per second. The desktop cadence is unchanged.
+    - Hidden File Sync and Configuration Sync pause their periodic scans while the plug-in is suspended, and resume with it.
+    - Hidden File Sync probes at most 10 hidden files at once, and reads the internal metadata range in pages of 1,000 documents instead of one response.
+    - Deleting customisation sync data streams identifiers and deletes in batches of 100.
+    - Unused-chunk collection releases its chunk lists before replication and compaction, and compacts the local database once afterwards.
+    - Incoming replication results are coalesced per document, and the recovery snapshot is written at most once per second instead of every 50 ms.
+    - Conflict checks run at most two at a time, and refreshes skip files which are neither active nor postponed.
+    - Dragging the revision slider in Document History loads revisions once, 275 ms after the last movement, instead of on every movement.
+    - The start-up integrity check yields to the interface every 128 documents and skips Metadata for deleted files.
+    - Recognised same-change pairs are limited to the 4,096 most recently used paths.
+
+- The plug-in bundle is smaller.
+    - Compression runs two passes instead of one, which reduces `main.js` by 68,574 B (1.68 %). The status bar no longer paints a blurred backdrop, a greyscale filter, or a repeating animation.
+
 ## 1.0.45
 
 5th November, 2026
@@ -281,45 +307,3 @@ Thank you for your contributions!
 - @rwbru, for the original Setup URI environment-variable fix (#817).
 - @junkerderprovinz, for adapting that fix to the current generator while preserving compatibility with existing scripts (#1274).
 - @s-qin, for reducing memory use during start-up checks and avoiding repeated content decoding in Commonlib (#1283, Commonlib #184).
-
-## 1.0.40
-
-24th October, 2026
-
-This has turned into a slightly larger set of changes overall, but I have finally been able to implement the features I felt we would need.
-
-### Synchronisation
-
-#### New Feature
-
-- We can choose **Review devices** in Remote Configuration, the command palette, or a version Notice to review participating devices.
-    - Our device appears first, with its lockout state. Other records show the platform, plug-in version, app version, and last recorded connection time when available.
-    - An advisory Notice identifies Self-hosted LiveSync and lists newer and older versions separately, with one shared recommendation and **Review devices** action. The dialogue explains possible storage costs and P2P compatibility limits.
-- We can forget records belonging to lost or retired devices while preserving the remote lock state and other devices.
-    - Forgetting a record does not delete Vault files or revoke credentials. A returning device can register again on an unlocked remote.
-
-#### Fixed
-
-- We can reuse unchanged content more reliably after edits with the V3 Rabin–Karp chunk splitter.
-    - Corrected rolling-window processing lets boundary detection recover after an insertion. Existing content remains readable, and installing this update does not trigger a full re-chunk of our Vaults.
-    - Chunk-size values 0 and 1 now use content-defined binary boundaries below their maximum lengths, improving reuse after an insertion instead of producing fixed-length pieces.
-    - Editing or explicitly rewriting a file, recreating its chunks, or rebuilding from our files can produce different chunk boundaries and additional chunks. Older and updated devices can retain different chunk layouts; this affects reuse and storage, not the file contents.
-- We can preserve all conflict branches, including deleted branches, during Fast Setup.
-    - A fresh, complete Fast Fetch can also hand its verified progress to ordinary synchronisation before file watching resumes, reducing the first subsequent identifier scan. Existing resume cursors and On Demand chunk retrieval retain their existing behaviour.
-
-#### Changed
-
-- New setup uses the same Chunk-size recommendation of 0 across remote types, and Setting Doctor no longer recommends increasing every self-hosted V3 configuration to 60.
-    - Setting Doctor no longer flags the saved **Enhance chunk size** value. When rebuilding with V3 Rabin–Karp, we recommend setting it to 0. This is now an efficient choice across all supported remote types.
-    - Existing explicit and agreed values are retained. Smaller Chunks favour reuse during editing, but increase document counts and can make first uploads and large rebuilds slower. Mostly immutable binary Vaults can still benefit from a larger explicit value.
-
-### Hidden File Sync
-
-#### Fixed
-
-- We can synchronise selected hidden files while the normal-file allow-list is set. (#1272)
-    - Normal-file exclusion patterns still apply to hidden files, and the Selector descriptions now explain their scope.
-
-### CLI
-
-- Unreadable or malformed device-local state now stops initialisation instead of being treated as empty. Existing valid state files keep their format.
