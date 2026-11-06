@@ -1,6 +1,6 @@
 # Self-hosted LiveSync Efficient
 
-This is the Efficient fork of [Self-hosted LiveSync](https://github.com/vrtmrz/obsidian-livesync), maintained by [steimerbyte](https://github.com/steimerbyte). It keeps the upstream synchronisation protocol and adds a load-aware RAM/CPU optimiser, bounded file reads, and the performance work documented under [Performance and Resource Usage](#performance-and-resource-usage).
+This is the Efficient fork of [Self-hosted LiveSync](https://github.com/vrtmrz/obsidian-livesync), maintained by [steimerbyte](https://github.com/steimerbyte). It keeps the upstream synchronisation protocol and adds a load-aware RAM/CPU optimiser, bounded file reads, compact notification and status surfaces, and the performance work documented under [Performance and Resource Usage](#performance-and-resource-usage).
 
 - Plug-in ID: `livesync-efficient` (deliberately distinct from upstream, so Community Plugins updates cannot overwrite this fork).
 - Install with BRAT from `steimerbyte/obsidian-livesync`, or copy the release assets into `.obsidian/plugins/livesync-efficient/`.

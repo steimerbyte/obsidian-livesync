@@ -12,6 +12,37 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+## 1.0.47
+
+6th November, 2026
+
+This release gives the fork its own identity and adds the load-aware resource governor. It follows upstream 1.0.46.
+
+### Fork identity
+
+- Plugin ID `livesync-efficient`, name `Self-hosted LiveSync Efficient`, author `steimerbyte`.
+- The distinct ID means a Community Plugins update of upstream `obsidian-livesync` cannot overwrite this fork.
+- Existing vaults migrate by renaming `.obsidian/plugins/obsidian-livesync` to `.obsidian/plugins/livesync-efficient` and updating `community-plugins.json`. Keep the old `PLUGIN_ALL/obsidian-livesync` pause entries until the remote customisation documents have been reconciled.
+
+### Performance
+
+- Added a load-aware RAM/CPU governor with separate `user`, `interactive`, and `background` limits. Desktop defaults are 4/2/2, mobile 2/2/1; high pressure drops them to 1/1/0. Replication stays outside the governor so the SyncGuard contract is unchanged.
+- Added a central read-size guard in `FileAccessObsidian`: 16 MiB on mobile, 64 MiB on desktop.
+- Hidden File Sync now uses a bounded worker pool, avoids reading whole files just to obtain an mtime, and applies size guards before reads.
+- Customisation Sync honours paused plugin groups by prefix (`PLUGIN_ALL/<name>`), not only individual files.
+- Reduced conflict-processing concurrency and debounced the history slider; compacted the local PouchDB after `gcv3` and paginated HFS reads in 1,000-row batches.
+
+### Notification and status surfaces
+
+- The governor status command now renders a compact card instead of a plain multi-line notice.
+- The debug-info confirmation and persistent reminders use short, structured copy with a real keyboard-operable button.
+- The editor status overlay uses theme colours instead of blanket opacity and exposes warnings through `role="status"`.
+
+### Upgrade
+
+- Copy the release assets into `.obsidian/plugins/livesync-efficient/`, or install with BRAT from `steimerbyte/obsidian-livesync`.
+- Back up `data.json`, `app.json`, `appearance.json`, and `community-plugins.json` before migrating an existing vault.
+
 ## 1.0.46
 
 6th November, 2026
