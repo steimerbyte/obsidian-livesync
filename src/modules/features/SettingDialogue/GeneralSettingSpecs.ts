@@ -4,13 +4,11 @@ import { NetworkWarningStyles } from "@vrtmrz/livesync-commonlib/compat/common/m
 import type { SettingSpecGroup } from "./SettingSpec.ts";
 
 export type GeneralSettingSpecContext = {
-    showEditorStatusDetails: () => boolean;
     showVerboseLog: () => boolean;
 };
 
 /** Build the shared General Settings controls. */
 export function createGeneralSettingSpecGroups({
-    showEditorStatusDetails,
     showVerboseLog,
 }: GeneralSettingSpecContext): readonly SettingSpecGroup[] {
     return [
@@ -27,13 +25,6 @@ export function createGeneralSettingSpecGroups({
                             ),
                     },
                 },
-                { key: "showStatusOnEditor", control: { type: "toggle" } },
-                {
-                    key: "showOnlyIconsOnEditor",
-                    control: { type: "toggle" },
-                    visible: showEditorStatusDetails,
-                },
-                { key: "showStatusOnStatusbar", control: { type: "toggle" } },
                 { key: "hideFileWarningNotice", control: { type: "toggle" } },
                 { key: "syncGuardEnabled", control: { type: "toggle" } },
                 { key: "syncGuardMinimumFiles", control: { type: "number", min: 1 } },

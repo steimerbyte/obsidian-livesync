@@ -32,7 +32,7 @@ const pluginFiles = {
     [`${pluginRoot}/styles.css`]: ".livesync-catalogue-example { color: red; }\n",
 };
 const allowList = "\\.(?:md|png|pdf)$";
-const coreCode = "const core=app.plugins.plugins['obsidian-livesync'].core;";
+const coreCode = "const core=app.plugins.plugins['livesync-efficient'].core;";
 const configCode = `${coreCode}const addOn=core.getAddOn('ConfigSync');`;
 const settleCode = `
     const settle=async()=>{
@@ -160,7 +160,7 @@ async function main() {
             return JSON.stringify({seeded:true});
         `);
         const opened = await evaluate<{ opened: boolean }>(
-            `return JSON.stringify({opened:app.commands.executeCommandById('obsidian-livesync:livesync-plugin-dialog-ex')});`
+            `return JSON.stringify({opened:app.commands.executeCommandById('livesync-efficient:livesync-plugin-dialog-ex')});`
         );
         if (!opened.opened) throw new Error("Could not open the Customisation Sync dialogue command");
         await withObsidianPage(session.remoteDebuggingPort, async (page) => {

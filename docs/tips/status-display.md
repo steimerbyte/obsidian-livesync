@@ -1,6 +1,6 @@
-# Synchronisation status and CSS customisation
+# Synchronisation status
 
-Use [General Settings](../settings.md#2-general-settings) to choose whether synchronisation status appears in the status bar, inside the editor, or both. The following sections explain the indicators and how to customise their appearance.
+LiveSync reports synchronisation status in the status bubble above the active note. The bubble shows a headline, a progress bar, category rows, and the raw live status block. The following sections explain the indicators it reports.
 
 ## Status indicators
 
@@ -37,62 +37,27 @@ When CouchDB change history is being compared, directional counts can appear bef
 
 Each directional count has its own display timer. A positive count remains visible for three seconds after its last change, then clears; a count which reaches zero clears immediately. A change in one direction does not extend the other direction's timer. The ⏩ status icon follows comparison activity independently of these timers.
 
-## Customising status items with CSS snippets
+## Category rows
 
-The status bar and editor overlay use individual spans with the common `livesync-stat-` class prefix. CSS snippets can hide or style individual items. For example, this hides both directional comparison counts and the P2P summary:
+The expanded card keeps six category rows current while it is open, each with a coloured dot:
 
-```css
-.livesync-stat-ff-push,
-.livesync-stat-ff-pull,
-.livesync-stat-p2p {
-    display: none;
-}
-```
+| Category | Reports |
+| --- | --- |
+| Initialisation | LiveSync has finished starting up. |
+| Replication | The current replication run: completed, running, or errored. |
+| Sync | The same overall state as the orb. |
+| Config sync | A customisation sweep is in progress. |
+| Storage | The storage, database, and chunk queues are empty. |
+| Warnings | There is no unresolved file or network warning. |
 
-The item classes include `livesync-stat-network`, `livesync-stat-sync`, `livesync-stat-sent`, `livesync-stat-push-remaining`, `livesync-stat-arrived`, `livesync-stat-pull-remaining`, `livesync-stat-ff-push`, `livesync-stat-ff-pull`, and `livesync-stat-p2p`. File-processing items use `livesync-stat-file-processing`, `livesync-stat-file-pending`, and `livesync-stat-file-batched`; queue items use `livesync-stat-queue-` followed by `replication`, `database`, `storage`, `chunk-initial`, `chunk-retrying`, `plugin-scan`, `hidden-files`, or `conflicts`. The skipped-file indicator uses `livesync-stat-file-skip`.
+-   **Green** — ready or idle.
+-   **Yellow** — active, starting, or a backlog still draining.
+-   **Red** — an error, or a warning that needs attention.
 
-The former `livesync-stat-ff` class has been replaced by `livesync-stat-ff-push` and `livesync-stat-ff-pull`. Update existing CSS snippets to target one or both of the directional classes.
+Below the rows, the raw live log shows the current status text followed by the newest eight log lines, newest first, and scrolls within the card.
 
-All items also have `livesync-stat-item`. Numeric children use `livesync-stat-value`, tabular digits, and right alignment. Each numeric item retains its widest displayed digit count during an active period, reducing movement as counts decrease. The editor overlay uses wider gaps between items, while remaining counts stay beside their transfer totals.
+## Customising the bubble
 
-Inactive items receive `livesync-stat-inactive` instead of the HTML `hidden` attribute. The default CSS hides them immediately. They retain their last text, numeric width, and position amongst the other items so that CSS snippets can customise how they disappear. The numeric width starts afresh when an item becomes active again.
-
-### Animate editor status items
-
-This optional CSS snippet shrinks inactive items in the editor status line and expands them when they reappear. It applies to all status items in that line. Because inactive items remain in the DOM, their width can transition as their state changes; the initial creation of an item is not guaranteed to animate. Text changes, including on first appearance, do not necessarily animate an item's width. The `@supports` guard leaves the default, immediate hiding behaviour in place in CSS engines which do not support `calc-size()`.
-
-```css
-@supports (width: calc-size(auto, size)) {
-    .livesync-status-statusline > .livesync-stat-item {
-        font-variant-numeric: tabular-nums;
-        transition: width 0.125s;
-        display: inline-block;
-        width: calc-size(auto, size);
-        overflow: hidden;
-        white-space: nowrap;
-    }
-
-    .livesync-status-statusline > .livesync-stat-item.livesync-stat-inactive {
-        transition: width 0.46s;
-        display: inline-block;
-        width: calc-size(auto, size * 0);
-        overflow: hidden;
-        white-space: nowrap;
-        margin-inline-start: 0 !important;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .livesync-status-statusline > .livesync-stat-item {
-            transition: none;
-        }
-
-        .livesync-status-statusline > .livesync-stat-item.livesync-stat-inactive {
-            transition: none;
-        }
-    }
-}
-```
-
-The snippet affects the editor overlay only; the status bar keeps its default appearance. See the [`calc-size()` reference](https://developer.chrome.com/docs/css-ui/animate-to-height-auto/) for the CSS feature used to calculate an item's intrinsic width.
+The bubble and its category rows are styled in `styles.css`. Older releases also drew individual `livesync-stat-*` spans in an editor overlay and in the Obsidian status bar; both are gone, so CSS snippets which targeted those classes no longer match anything. The bubble shows the category rows together with the raw live status block.
 
 See the [documentation index](../README.md) for setup and troubleshooting guides.

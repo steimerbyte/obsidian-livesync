@@ -43,7 +43,7 @@ async function readFeatureState(cliBinary: string, env: NodeJS.ProcessEnv): Prom
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             `const id=${JSON.stringify(VERSIONING_DOCID)};`,
             "const info=await core.localDatabase.getRaw(id).catch(()=>null);",
             "const replicator=core.services.replicator.getActiveReplicator();",
@@ -131,7 +131,7 @@ async function main(): Promise<void> {
             cli.binary,
             [
                 "(async()=>{",
-                "const core=app.plugins.plugins['obsidian-livesync'].core;",
+                "const core=app.plugins.plugins['livesync-efficient'].core;",
                 "await core.services.setting.applyExternalSettings({liveSync:true},true);",
                 "await core.services.control.applySettings();",
                 "const result=await core.services.replication.startContinuous({trigger:'daemon',interaction:{kind:'forbidden'}});",
@@ -163,7 +163,7 @@ async function main(): Promise<void> {
 
         const replicated = await evalObsidianJson<boolean>(
             cli.binary,
-            "(async()=>JSON.stringify(!!(await app.plugins.plugins['obsidian-livesync'].core.services.replication.replicate(true))))()",
+            "(async()=>JSON.stringify(!!(await app.plugins.plugins['livesync-efficient'].core.services.replication.replicate(true))))()",
             session.cliEnv
         );
         if (replicated) throw new Error("An unknown remote feature was admitted for another replication.");
@@ -183,14 +183,14 @@ async function main(): Promise<void> {
         );
         const replicatedAfterRestart = await evalObsidianJson<boolean>(
             cli.binary,
-            "(async()=>JSON.stringify(!!(await app.plugins.plugins['obsidian-livesync'].core.services.replication.replicate(true))))()",
+            "(async()=>JSON.stringify(!!(await app.plugins.plugins['livesync-efficient'].core.services.replication.replicate(true))))()",
             session.cliEnv
         );
         const continuousAfterRestart = await evalObsidianJson<{ requestStatus: string; connected: boolean }>(
             cli.binary,
             [
                 "(async()=>{",
-                "const core=app.plugins.plugins['obsidian-livesync'].core;",
+                "const core=app.plugins.plugins['livesync-efficient'].core;",
                 "const replicator=core.services.replicator.getActiveReplicator();",
                 "const original=replicator.openContinuousReplication;",
                 "let completion;",

@@ -154,7 +154,7 @@ async function installObserver(cliBinary: string, env: NodeJS.ProcessEnv): Promi
             "const previous=globalThis[key];",
             "if(previous) previous.unsubscribeReady?.();",
             "const state={readinessEvents:0,unsubscribeReady:null};",
-            "state.unsubscribeReady=app.plugins.plugins['obsidian-livesync'].core.services.context.events.onEvent(readyEvent,()=>state.readinessEvents++);",
+            "state.unsubscribeReady=app.plugins.plugins['livesync-efficient'].core.services.context.events.onEvent(readyEvent,()=>state.readinessEvents++);",
             "globalThis[key]=state;",
             "return JSON.stringify(true);",
             "})()",
@@ -184,7 +184,7 @@ async function resetReadiness(cliBinary: string, env: NodeJS.ProcessEnv, suspend
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             ...(suspendReflecting
                 ? [
                       "await core.services.setting.applyPartial({suspendParseReplicationResult:true},true);",
@@ -211,7 +211,7 @@ async function waitForReceivedWhileUnready(
     if (entry.children.length === 0) throw new Error(`The target received metadata without Chunks: ${path}`);
     const readiness = await evalObsidianJson<{ ready: boolean }>(
         cliBinary,
-        "(()=>JSON.stringify({ready:app.plugins.plugins['obsidian-livesync'].core.services.appLifecycle.isReady()}))()",
+        "(()=>JSON.stringify({ready:app.plugins.plugins['livesync-efficient'].core.services.appLifecycle.isReady()}))()",
         env
     );
     assertEqual(readiness.ready, false, `The target became ready before applying ${path}.`);
@@ -223,7 +223,7 @@ async function startContinuousReplication(cliBinary: string, env: NodeJS.Process
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "await core.services.setting.applyExternalSettings({liveSync:true},true);",
             "await core.services.control.applySettings();",
             "const result=await core.services.replication.startContinuous({trigger:'daemon',interaction:{kind:'forbidden'}});",
@@ -239,7 +239,7 @@ async function startContinuousReplication(cliBinary: string, env: NodeJS.Process
     while (!active && Date.now() < deadline) {
         active = await evalObsidianJson<boolean>(
             cliBinary,
-            "(()=>JSON.stringify(!!app.plugins.plugins['obsidian-livesync'].core.services.replicator.getActiveReplicator()))()",
+            "(()=>JSON.stringify(!!app.plugins.plugins['livesync-efficient'].core.services.replicator.getActiveReplicator()))()",
             env
         );
         if (!active) await new Promise((resolve) => setTimeout(resolve, 250));
@@ -252,7 +252,7 @@ async function markReadyTwice(cliBinary: string, env: NodeJS.ProcessEnv): Promis
         cliBinary,
         [
             "(()=>{",
-            "const lifecycle=app.plugins.plugins['obsidian-livesync'].core.services.appLifecycle;",
+            "const lifecycle=app.plugins.plugins['livesync-efficient'].core.services.appLifecycle;",
             "lifecycle.markIsReady();",
             "lifecycle.markIsReady();",
             "return JSON.stringify({ready:lifecycle.isReady()});",
@@ -388,7 +388,7 @@ async function main(): Promise<void> {
 
         await evalObsidianJson(
             cli.binary,
-            "(async()=>{const setting=app.plugins.plugins['obsidian-livesync'].core.services.setting;await setting.applyPartial({suspendParseReplicationResult:false},true);return JSON.stringify(true);})()",
+            "(async()=>{const setting=app.plugins.plugins['livesync-efficient'].core.services.setting;await setting.applyPartial({suspendParseReplicationResult:false},true);return JSON.stringify(true);})()",
             target.cliEnv
         );
         await assertApplied(cli.binary, target.cliEnv, targetVault, suspendedPath, suspendedContent, 2);

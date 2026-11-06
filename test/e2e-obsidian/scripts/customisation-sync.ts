@@ -196,7 +196,7 @@ async function inspectCustomisationVisibility(session: ObsidianLiveSyncSession):
     await withObsidianPage(session.remoteDebuggingPort, async (page) => {
         const opened = await page.evaluate(() =>
             (globalThis as CustomisationSyncTestGlobal).app?.commands?.executeCommandById(
-                "obsidian-livesync:livesync-plugin-dialog-ex"
+                "livesync-efficient:livesync-plugin-dialog-ex"
             )
         );
         if (opened !== true) throw new Error("Could not open the Customisation Sync dialogue command.");
@@ -233,7 +233,7 @@ async function inspectPluginFreshnessAndNewestSelection(session: ObsidianLiveSyn
     await withObsidianPage(session.remoteDebuggingPort, async (page) => {
         const opened = await page.evaluate(() =>
             (globalThis as CustomisationSyncTestGlobal).app?.commands?.executeCommandById(
-                "obsidian-livesync:livesync-plugin-dialog-ex"
+                "livesync-efficient:livesync-plugin-dialog-ex"
             )
         );
         if (opened !== true) throw new Error("Could not open the Customisation Sync dialogue command.");
@@ -276,7 +276,7 @@ async function inspectPluginFreshnessAndNewestSelection(session: ObsidianLiveSyn
 async function openAutomaticModeForPlugin(page: Page, pluginName: string): Promise<Locator> {
     const opened = await page.evaluate(() =>
         (globalThis as CustomisationSyncTestGlobal).app?.commands?.executeCommandById(
-            "obsidian-livesync:livesync-plugin-dialog-ex"
+            "livesync-efficient:livesync-plugin-dialog-ex"
         )
     );
     if (opened !== true) throw new Error("Could not open the Customisation Sync dialogue command.");
@@ -301,7 +301,7 @@ async function readAutomaticSyncSnapshot(cliBinary: string, env: NodeJS.ProcessE
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const hidden=core.getAddOn('HiddenFileSync');",
             "const files=await hidden.getAllDatabaseFiles();",
             "const processed=(cache)=>Array.from(cache.keys()).sort().map((path)=>[path,cache.get(path)]);",
@@ -325,7 +325,7 @@ async function readAutomaticFileContents(context: RunnerContext, session: Obsidi
         context.cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             `const paths=${JSON.stringify([pluginStylesPath, pluginDataPath])};`,
             "const files=await Promise.all(paths.map(async(path)=>{",
             "const entry=await core.localDatabase.getDBEntry('i:'+path,undefined,false,true);",
@@ -358,7 +358,7 @@ async function setHiddenSyncEnabledForFixture(
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             `core.settings.syncInternalFiles=${JSON.stringify(enabled)};`,
             "return JSON.stringify({syncInternalFiles:core.settings.syncInternalFiles});",
             "})()",
@@ -629,7 +629,7 @@ async function startConfiguredSession(
     if (Object.keys(settings.pluginSyncExtendedSetting ?? {}).length > 0) {
         const restoredSelections = await evalObsidianJson<ObsidianLiveSyncSettings["pluginSyncExtendedSetting"]>(
             context.cliBinary,
-            "JSON.stringify(app.plugins.plugins['obsidian-livesync'].core.settings.pluginSyncExtendedSetting)",
+            "JSON.stringify(app.plugins.plugins['livesync-efficient'].core.settings.pluginSyncExtendedSetting)",
             session.cliEnv
         );
         assertEqual(
@@ -643,7 +643,7 @@ async function startConfiguredSession(
         context.cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             `core.services.setting.setDeviceAndVaultName(${JSON.stringify(deviceName)});`,
             "await core.services.setting.saveSettingData();",
             "return JSON.stringify({device:core.services.setting.getDeviceAndVaultName()});",
@@ -661,7 +661,7 @@ async function scanCustomisations(cliBinary: string, env: NodeJS.ProcessEnv): Pr
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const addOn=core.getAddOn('ConfigSync');",
             "const before=await addOn.scanInternalFiles();",
             "await addOn.scanAllConfigFiles(false);",
@@ -685,7 +685,7 @@ async function storeCustomisationFile(cliBinary: string, env: NodeJS.ProcessEnv,
         [
             "(async()=>{",
             `const path=${JSON.stringify(path)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const addOn=core.getAddOn('ConfigSync');",
             "const term=core.services.setting.getDeviceAndVaultName();",
             "const stat=await core.storageAccess.statHidden(path);",
@@ -719,7 +719,7 @@ async function deleteCustomisationSyncEntry(
             `const category=${JSON.stringify(category)};`,
             `const name=${JSON.stringify(name)};`,
             `const term=${JSON.stringify(term ?? "")};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const addOn=core.getAddOn('ConfigSync');",
             "const rows=(await core.localDatabase.allDocsRaw({include_docs:true})).rows;",
             "const entry=rows.map((row)=>row.doc).find((doc)=>doc?.path?.includes(`/${category}/`)&&doc.path?.includes(`/${name}%`)&&(!term||doc.path?.startsWith(`ix:${term}/`))&&!doc.deleted&&!doc._deleted)||false;",
@@ -764,7 +764,7 @@ async function waitForCustomisationEntries(
             `const count=${JSON.stringify(count)};`,
             `const term=${JSON.stringify(term ?? "")};`,
             `const timeoutMs=${JSON.stringify(timeoutMs)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const deadline=Date.now()+timeoutMs;",
             "const sleep=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms));",
             "let entries=[];",
@@ -802,7 +802,7 @@ async function waitForCustomisationEntryAbsent(
             `const name=${JSON.stringify(name)};`,
             `const term=${JSON.stringify(term ?? "")};`,
             `const timeoutMs=${JSON.stringify(timeoutMs)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const deadline=Date.now()+timeoutMs;",
             "const sleep=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms));",
             "let entry=false;",
@@ -833,7 +833,7 @@ async function applyRemoteCustomisationEntry(
             `const category=${JSON.stringify(category)};`,
             `const name=${JSON.stringify(name)};`,
             `const term=${JSON.stringify(term ?? "")};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const addOn=core.getAddOn('ConfigSync');",
             "const rows=(await core.localDatabase.allDocsRaw({include_docs:true})).rows;",
             "const entry=rows.map((row)=>row.doc).find((doc)=>doc?.path?.includes(`/${category}/`)&&doc.path?.includes(`/${name}%`)&&(!term||doc.path?.startsWith(`ix:${term}/`)))||false;",
@@ -867,7 +867,7 @@ async function applyRemoteCustomisationGroup(
             `const category=${JSON.stringify(category)};`,
             `const name=${JSON.stringify(name)};`,
             `const term=${JSON.stringify(term ?? "")};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const addOn=core.getAddOn('ConfigSync');",
             "const rows=(await core.localDatabase.allDocsRaw({include_docs:true})).rows;",
             "const entries=rows.map((row)=>row.doc).filter((doc)=>doc?.path?.includes(`/${category}/`)&&doc.path?.includes(`/${name}%`)&&(!term||doc.path?.startsWith(`ix:${term}/`)));",
@@ -997,7 +997,7 @@ async function runWorkflow(
                 context.cliBinary,
                 [
                     "(async()=>{",
-                    "const hidden=app.plugins.plugins['obsidian-livesync'].core.getAddOn('HiddenFileSync');",
+                    "const hidden=app.plugins.plugins['livesync-efficient'].core.getAddOn('HiddenFileSync');",
                     `const paths=${JSON.stringify([pluginManifestPath, pluginMainPath, pluginStylesPath, pluginDataPath])};`,
                     "const result=await hidden.initialiseInternalFileSync('pushForce',false,paths);",
                     "if(result!==true) throw new Error('Could not prepare source hidden-file documents.');",

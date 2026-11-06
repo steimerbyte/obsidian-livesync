@@ -70,7 +70,7 @@ async function createNoteAndWaitForLocalDb(cliBinary: string, env: NodeJS.Proces
             "(async()=>{",
             `const path=${JSON.stringify(notePath)};`,
             `const content=${JSON.stringify(noteContent)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const parent=path.slice(0,path.lastIndexOf('/'));",
             "if(!(await app.vault.adapter.exists(parent))) await app.vault.createFolder(parent);",
             "const existing=app.vault.getAbstractFileByPath(path);",
@@ -231,7 +231,7 @@ async function main(): Promise<void> {
                     cli.binary,
                     [
                         "(async()=>{",
-                        "const service=app.plugins.plugins['obsidian-livesync'].core.services.setting;",
+                        "const service=app.plugins.plugins['livesync-efficient'].core.services.setting;",
                         "const s=service.currentSettings();",
                         `const keys=${JSON.stringify([...Object.keys(TweakValuesTemplate), "encrypt", "passphrase", "usePathObfuscation", "E2EEAlgorithm", "idDerivationKey"])};`,
                         "const values=Object.fromEntries(keys.map(key=>[key,s[key]]));",

@@ -165,7 +165,7 @@ async function createVaultNote(
             "const parent=path.slice(0,path.lastIndexOf('/'));",
             "if(!(await app.vault.adapter.exists(parent)))await app.vault.createFolder(parent);",
             "await app.vault.create(path,content);",
-            "await app.plugins.plugins['obsidian-livesync'].core.services.fileProcessing.commitPendingFileEvents();",
+            "await app.plugins.plugins['livesync-efficient'].core.services.fileProcessing.commitPendingFileEvents();",
             "return JSON.stringify(true);",
             "})()",
         ].join(""),
@@ -285,7 +285,7 @@ function readTreeSource(path: string, expectedBaseRev: string, requireAncestorBo
         `const path=${JSON.stringify(path)};`,
         `const expectedBaseRev=${JSON.stringify(expectedBaseRev)};`,
         `const requireAncestorBody=${JSON.stringify(requireAncestorBody)};`,
-        "const core=app.plugins.plugins['obsidian-livesync'].core;",
+        "const core=app.plugins.plugins['livesync-efficient'].core;",
         "const db=core.localDatabase;",
         "const readRevision=async(rev)=>{",
         "const metadata=await db.getDBEntryMeta(path,{rev,revs:true},true);",
@@ -431,7 +431,7 @@ async function storeSourceLeaf(
             "(async()=>{",
             `const path=${JSON.stringify(path)};`,
             `const content=${JSON.stringify(content)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const file=app.vault.getFiles().find(candidate=>candidate.path.normalize('NFC')===path.normalize('NFC'));",
             "if(!file) throw new Error('Could not find the NFC-equivalent source file '+path);",
             "await app.vault.modify(file,content);",
@@ -472,7 +472,7 @@ async function storeCompetingLeaf(
             `const path=${JSON.stringify(path)};`,
             `const content=${JSON.stringify(content)};`,
             `const baseRev=${JSON.stringify(baseRev)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const id=await core.services.path.path2id(path);",
             "const blob=new Blob([content],{type:'text/plain'});",
             "const now=Date.now();",
@@ -495,7 +495,7 @@ async function readTransferCheckpoint(cliBinary: string, env: NodeJS.ProcessEnv)
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const replicator=core.services.replicator.getActiveReplicator();",
             "const client=replicator?.client;",
             "if(!client||typeof client.getCheckpointInfo!=='function') throw new Error('The active Object Storage replicator did not expose its Journal checkpoint.');",
@@ -594,7 +594,7 @@ async function verifySingleJournalRecovery(
             cliBinary,
             [
                 "(async()=>{",
-                "const core=app.plugins.plugins['obsidian-livesync'].core;",
+                "const core=app.plugins.plugins['livesync-efficient'].core;",
                 "const replicator=core.services.replicator.getActiveReplicator();",
                 "const stopped=replicator.getStoppedJournal();",
                 "const checkpoint=await replicator.client.getCheckpointInfo();",
@@ -618,7 +618,7 @@ async function verifySingleJournalRecovery(
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const replicator=core.services.replicator.getActiveReplicator();",
             "return JSON.stringify(await replicator.replicateAllFromServer(core.settings,true));",
             "})()",
@@ -687,7 +687,7 @@ async function verifySingleJournalRecovery(
         }
     });
     const saved = JSON.parse(
-        await readFile(join(vaultPath, ".obsidian/plugins/obsidian-livesync/data.json"), "utf8")
+        await readFile(join(vaultPath, ".obsidian/plugins/livesync-efficient/data.json"), "utf8")
     ) as Record<string, unknown>;
     assertEqual("ignoreBrokenJournals" in saved, false, "Recovery must not persist a skip toggle.");
     console.log(
@@ -709,7 +709,7 @@ async function rebuildRemote(cliBinary: string, env: NodeJS.ProcessEnv, port: nu
         cliBinary,
         [
             "(()=>{",
-            "const rebuilder=app.plugins.plugins['obsidian-livesync'].core.rebuilder;",
+            "const rebuilder=app.plugins.plugins['livesync-efficient'].core.rebuilder;",
             "const state={done:false,error:null};",
             "globalThis.__journalNfcRemoteRebuild=state;",
             "void Promise.resolve().then(()=>rebuilder.$rebuildRemote()).then(()=>{state.done=true;},error=>{state.error=String(error?.stack??error);});",
@@ -769,7 +769,7 @@ async function fetchIntoFreshVault(cliBinary: string, env: NodeJS.ProcessEnv, pa
         [
             "(async()=>{",
             `const path=${JSON.stringify(path)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const existing=await core.localDatabase.getDBEntry(path,undefined,false,true,true).catch(()=>false);",
             "if(existing) throw new Error('The fresh receiving database already contains the conflict Metadata.');",
             "await core.rebuilder.$fetchLocal(false,true);",

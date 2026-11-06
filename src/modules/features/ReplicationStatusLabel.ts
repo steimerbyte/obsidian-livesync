@@ -3,7 +3,6 @@ import type { ReplicationStatics } from "@vrtmrz/livesync-commonlib/replication"
 import { compatGlobal } from "@vrtmrz/livesync-commonlib/compat/common/coreEnvFunctions";
 
 import type { DisposableReactiveValue } from "./StatusBarDisplay.ts";
-import type { StatusBarPart } from "./StatusBarRenderer.ts";
 import {
     formatRemoteActivityStatusLabel,
     REMOTE_OPERATION_ACTIVITY_ICON,
@@ -12,6 +11,15 @@ import {
 } from "./RemoteActivityStatus.ts";
 
 export const FAST_FORWARD_COUNT_LINGER_MS = 3_000;
+
+/** One displayable counter or marker in the LiveSync status labels. */
+export type StatusBarPart = {
+    key: string;
+    text: string;
+    value?: number;
+    suffix?: string;
+    title?: string;
+};
 
 export type FastForwardCheckedChanges = {
     push?: number;

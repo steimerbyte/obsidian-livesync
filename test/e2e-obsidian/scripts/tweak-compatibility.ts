@@ -125,7 +125,7 @@ async function replicateOnce(cliBinary: string, env: NodeJS.ProcessEnv): Promise
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "await core.services.fileProcessing.commitPendingFileEvents();",
             "const result=await core.services.replication.replicate(true);",
             "return JSON.stringify({succeeded:result===true,raw:result??null});",
@@ -140,7 +140,7 @@ async function runSyncNow(cliBinary: string, env: NodeJS.ProcessEnv): Promise<vo
         cliBinary,
         [
             "(async()=>{",
-            "const command=app.commands.commands['obsidian-livesync:livesync-replicate'];",
+            "const command=app.commands.commands['livesync-efficient:livesync-replicate'];",
             "if(typeof command?.callback!=='function') throw new Error('Sync now command is unavailable');",
             "await command.callback();",
             "return JSON.stringify(true);",
@@ -263,7 +263,7 @@ async function readTweakState(
         cliBinary,
         [
             "(()=>{",
-            "const settings=app.plugins.plugins['obsidian-livesync'].core.services.setting.currentSettings();",
+            "const settings=app.plugins.plugins['livesync-efficient'].core.services.setting.currentSettings();",
             "return JSON.stringify({customChunkSize:settings.customChunkSize,usePluginSyncV2:settings.usePluginSyncV2,handleFilenameCaseSensitive:settings.handleFilenameCaseSensitive,encryptInternalMetadata:settings.encryptInternalMetadata,encrypt:settings.encrypt,usePathObfuscation:settings.usePathObfuscation,tweakModified:settings.tweakModified});",
             "})()",
         ].join(""),
@@ -301,7 +301,7 @@ async function verifyStaleTargetChoice(
     });
     await evalObsidianJson<unknown>(
         cliBinary,
-        "(async()=>{globalThis.__tweakCompatibilityPublication=await app.plugins.plugins['obsidian-livesync'].core.services.replicator.acquireActiveReplicatorContext();return JSON.stringify(true);})()",
+        "(async()=>{globalThis.__tweakCompatibilityPublication=await app.plugins.plugins['livesync-efficient'].core.services.replicator.acquireActiveReplicatorContext();return JSON.stringify(true);})()",
         session.cliEnv
     );
     await configureCouchDb(cliBinary, session.cliEnv, couchDbSettings(couchDb, replacementDbName), overrides);
@@ -309,7 +309,7 @@ async function verifyStaleTargetChoice(
         cliBinary,
         [
             "(async()=>{",
-            "const services=app.plugins.plugins['obsidian-livesync'].core.services;",
+            "const services=app.plugins.plugins['livesync-efficient'].core.services;",
             "const current=await services.replicator.acquireActiveReplicatorContext();",
             "globalThis.__tweakCompatibilitySettings=JSON.stringify(services.setting.currentSettings());",
             "return JSON.stringify(current!==globalThis.__tweakCompatibilityPublication);",
@@ -327,7 +327,7 @@ async function verifyStaleTargetChoice(
         cliBinary,
         [
             "(()=>{",
-            "const settings=app.plugins.plugins['obsidian-livesync'].core.services.setting.currentSettings();",
+            "const settings=app.plugins.plugins['livesync-efficient'].core.services.setting.currentSettings();",
             "const unchanged=JSON.stringify(settings)===globalThis.__tweakCompatibilitySettings;",
             "delete globalThis.__tweakCompatibilitySettings;delete globalThis.__tweakCompatibilityPublication;",
             "return JSON.stringify(unchanged);",

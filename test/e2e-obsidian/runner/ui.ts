@@ -143,7 +143,7 @@ export async function openLiveSyncSettings(page: Page, timeoutMs = 10_000): Prom
         const host = globalThis as ObsidianSettingsHost;
         const setting = host.app?.setting;
         if (setting === undefined) throw new Error("Obsidian settings are unavailable");
-        setting.openTabById("obsidian-livesync");
+        setting.openTabById("livesync-efficient");
     });
 
     const dialogue = settingsPage.locator(".modal.mod-settings:visible").last();

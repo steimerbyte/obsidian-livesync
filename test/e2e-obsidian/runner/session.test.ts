@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { startObsidianPluginSession } from "@vrtmrz/obsidian-test-session";
-import {
-    startObsidianLiveSyncSession,
-    type StartObsidianLiveSyncSessionOptions,
-} from "./session.ts";
+import { startObsidianLiveSyncSession, type StartObsidianLiveSyncSessionOptions } from "./session.ts";
 
 vi.mock("@vrtmrz/obsidian-test-session", () => ({
     startObsidianPluginSession: vi.fn(async () => ({
@@ -11,7 +8,7 @@ vi.mock("@vrtmrz/obsidian-test-session", () => ({
         cliEnv: {},
         install: {},
         readiness: {},
-        pluginId: "obsidian-livesync",
+        pluginId: "livesync-efficient",
         remoteDebuggingPort: 28052,
     })),
 }));
@@ -47,8 +44,17 @@ describe("LiveSync real-Obsidian session", () => {
         expect(startObsidianPluginSession).toHaveBeenCalledWith(
             expect.objectContaining({
                 artifactRoot: options.artifactRoot,
-                pluginId: "obsidian-livesync",
+                pluginId: "livesync-efficient",
                 vault,
+            })
+        );
+
+        await startObsidianLiveSyncSession({ ...options, pluginId: "obsidian-livesync" });
+
+        expect(startObsidianPluginSession).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                pluginId: "obsidian-livesync",
+                env: expect.objectContaining({ E2E_OBSIDIAN_PLUGIN_ID: "obsidian-livesync" }),
             })
         );
     });

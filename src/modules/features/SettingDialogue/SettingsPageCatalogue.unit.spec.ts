@@ -101,7 +101,6 @@ describe("settings page catalogue", () => {
 
     it("registers path identity once in General settings and leaves it out of Advanced", () => {
         const generalGroups = createGeneralSettingDefinitionGroups({
-            showEditorStatusDetails: () => true,
             showVerboseLog: () => true,
         });
         const generalKeys = generalGroups.flatMap(({ items = [] }) =>

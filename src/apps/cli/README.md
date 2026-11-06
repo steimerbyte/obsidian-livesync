@@ -424,7 +424,7 @@ The CLI uses the same settings format as the Obsidian plug-in. Create a `.livesy
     "couchDB_URI": "http://localhost:5984",
     "couchDB_USER": "admin",
     "couchDB_PASSWORD": "password",
-    "couchDB_DBNAME": "obsidian-livesync",
+    "couchDB_DBNAME": "livesync-efficient",
     "liveSync": true,
     "syncOnSave": true,
     "syncOnStart": true,

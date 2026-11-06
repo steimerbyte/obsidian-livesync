@@ -286,7 +286,7 @@ async function main(): Promise<void> {
         if (!currentSession) throw new Error("The Obsidian session is not running.");
         const script = [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync']?.core;",
+            "const core=app.plugins.plugins['livesync-efficient']?.core;",
             "const require=(condition,message)=>{if(!condition)throw new Error(message);};",
             "const contentOf=value=>Array.isArray(value)?value.join(''):value;",
             "const targetState=async path=>{",
@@ -445,7 +445,7 @@ async function main(): Promise<void> {
                 try {
                     snapshot.rendererState = await page.evaluate(async () => {
                         const host = globalThis as StartupFailureGlobal;
-                        const core = host.app?.plugins?.plugins?.["obsidian-livesync"]?.core;
+                        const core = host.app?.plugins?.plugins?.["livesync-efficient"]?.core;
                         let unresolvedMessages: string[] = [];
                         let unresolvedMessagesError: string | undefined;
                         try {
@@ -485,7 +485,7 @@ async function main(): Promise<void> {
                         (commandId) =>
                             (globalThis as StartupFailureGlobal).app?.commands?.executeCommandById?.(commandId) ===
                             true,
-                        "obsidian-livesync:view-log"
+                        "livesync-efficient:view-log"
                     );
                     if (!opened) throw new Error("The Show log command was not registered.");
                     const logPane = page.locator(".logpane");

@@ -99,7 +99,7 @@ async function main(): Promise<void> {
         if (!session) throw new Error("No active Obsidian session.");
         return await evalObsidianJson<T>(
             cliBinary,
-            `(async()=>{const core=app.plugins.plugins['obsidian-livesync'].core;${body}})()`,
+            `(async()=>{const core=app.plugins.plugins['livesync-efficient'].core;${body}})()`,
             session.cliEnv
         );
     };
@@ -164,10 +164,7 @@ async function main(): Promise<void> {
                 await connection.close();
             }`);
 
-    const metadataRequest = (
-        read: Awaited<ReturnType<typeof readCommonlibDocument>>,
-        id: string
-    ): ObservedRequest => {
+    const metadataRequest = (read: Awaited<ReturnType<typeof readCommonlibDocument>>, id: string): ObservedRequest => {
         const request = read.requests
             .filter((candidate) => {
                 const path = new URL(candidate.url).pathname;
@@ -191,13 +188,15 @@ async function main(): Promise<void> {
                 assert.equal(await row.locator(".checkbox-container.is-enabled").count(), Number(expectedBefore));
                 await row.locator(".checkbox-container").click();
                 await page.waitForFunction(
-                    `app.plugins.plugins['obsidian-livesync'].core.services.setting.currentSettings().useCouchDBCacheControlHeadersOnly === ${enabled}`
+                    `app.plugins.plugins['livesync-efficient'].core.services.setting.currentSettings().useCouchDBCacheControlHeadersOnly === ${enabled}`
                 );
             } finally {
                 await navigator.close();
             }
         });
-        const saved = JSON.parse(await readFile(join(vault.path, ".obsidian/plugins/obsidian-livesync/data.json"), "utf8"));
+        const saved = JSON.parse(
+            await readFile(join(vault.path, ".obsidian/plugins/livesync-efficient/data.json"), "utf8")
+        );
         assert.equal(saved.useCouchDBCacheControlHeadersOnly, enabled, "The compatibility switch was not saved.");
     };
     const assertLogicalDocument = (document: CouchDbDocument, original: CouchDbDocument): void => {
@@ -209,21 +208,23 @@ async function main(): Promise<void> {
         assert.ok(Array.isArray(document.children) && document.children.length > 0);
     };
     const readRestartState = async (): Promise<RestartState> =>
-        await evaluate<RestartState>([
-            "const settings=core.services.setting.currentSettings();",
-            "const database=core.localDatabase.localDatabase;",
-            "const databaseInfo=await database.info();",
-            "const nodeInfo=await database.get('_local/obsydian_livesync_nodeinfo').catch(()=>null);",
-            "const localMetadata=await core.localDatabase.getDBEntry('example.md',undefined,false,true).catch(()=>null);",
-            "return JSON.stringify({settings:{",
-            "useCouchDBCacheControlHeadersOnly:settings.useCouchDBCacheControlHeadersOnly===true,",
-            "couchDB_DBNAME:settings.couchDB_DBNAME,deviceAndVaultName:core.services.setting.getDeviceAndVaultName(),",
-            "encrypt:settings.encrypt,encryptInternalMetadata:settings.encryptInternalMetadata,",
-            "usePathObfuscation:settings.usePathObfuscation},",
-            "localDatabaseName:databaseInfo.db_name,",
-            "localMetadata:localMetadata?{id:localMetadata._id,revision:localMetadata._rev,path:localMetadata.path,children:localMetadata.children??[]}:null,",
-            "nodeId:nodeInfo?.nodeid??''});",
-        ].join(""));
+        await evaluate<RestartState>(
+            [
+                "const settings=core.services.setting.currentSettings();",
+                "const database=core.localDatabase.localDatabase;",
+                "const databaseInfo=await database.info();",
+                "const nodeInfo=await database.get('_local/obsydian_livesync_nodeinfo').catch(()=>null);",
+                "const localMetadata=await core.localDatabase.getDBEntry('example.md',undefined,false,true).catch(()=>null);",
+                "return JSON.stringify({settings:{",
+                "useCouchDBCacheControlHeadersOnly:settings.useCouchDBCacheControlHeadersOnly===true,",
+                "couchDB_DBNAME:settings.couchDB_DBNAME,deviceAndVaultName:core.services.setting.getDeviceAndVaultName(),",
+                "encrypt:settings.encrypt,encryptInternalMetadata:settings.encryptInternalMetadata,",
+                "usePathObfuscation:settings.usePathObfuscation},",
+                "localDatabaseName:databaseInfo.db_name,",
+                "localMetadata:localMetadata?{id:localMetadata._id,revision:localMetadata._rev,path:localMetadata.path,children:localMetadata.children??[]}:null,",
+                "nodeId:nodeInfo?.nodeid??''});",
+            ].join("")
+        );
 
     try {
         await createCouchDbDatabase(couchDb, dbName);
@@ -400,11 +401,19 @@ async function main(): Promise<void> {
         assert.deepEqual(stateAfterRestart.settings, stateBeforeRestart.settings);
         assert.equal(stateAfterRestart.localDatabaseName, stateBeforeRestart.localDatabaseName);
         assert.deepEqual(stateAfterRestart.localMetadata, stateBeforeRestart.localMetadata);
-        assert.equal(stateAfterRestart.nodeId, stateBeforeRestart.nodeId, "Restart changed the persisted device identity.");
+        assert.equal(
+            stateAfterRestart.nodeId,
+            stateBeforeRestart.nodeId,
+            "Restart changed the persisted device identity."
+        );
 
         const remoteAfterRestart = await fetchCouchDbDocument(couchDb, dbName, original._id);
         const seedAfterRestart = await fetchCouchDbDocument(couchDb, dbName, DOCID_SYNC_PARAMETERS);
-        assert.equal(remoteAfterRestart._rev, remoteBeforeRestart._rev, "Restart changed the remote Metadata revision.");
+        assert.equal(
+            remoteAfterRestart._rev,
+            remoteBeforeRestart._rev,
+            "Restart changed the remote Metadata revision."
+        );
         assert.equal(
             remoteAfterRestart.path,
             remoteBeforeRestart.path,
@@ -435,11 +444,15 @@ async function main(): Promise<void> {
         );
         assert.equal(restartedMetadataRequest.cache, "no-cache");
 
-        await evaluate("await core.services.setting.applyPartial({readChunksOnline:false},true);return JSON.stringify(true);");
-        const restartedFetchAttempt = await evaluate<{ succeeded: boolean; error?: string }>([
-            "try{await core.rebuilder.fetchLocal(false,true);return JSON.stringify({succeeded:true});}",
-            "catch(error){return JSON.stringify({succeeded:false,error:String(error)});}",
-        ].join(""));
+        await evaluate(
+            "await core.services.setting.applyPartial({readChunksOnline:false},true);return JSON.stringify(true);"
+        );
+        const restartedFetchAttempt = await evaluate<{ succeeded: boolean; error?: string }>(
+            [
+                "try{await core.rebuilder.fetchLocal(false,true);return JSON.stringify({succeeded:true});}",
+                "catch(error){return JSON.stringify({succeeded:false,error:String(error)});}",
+            ].join("")
+        );
         assert.ok(
             restartedFetchAttempt.succeeded,
             `Standard Fetch after restart failed: ${JSON.stringify(restartedFetchAttempt)}`
@@ -481,11 +494,15 @@ async function main(): Promise<void> {
         assert.equal(originalAfterRestartSync.path, remoteBeforeRestart.path);
         const uploadedRestartNoteRemote = await fetchCouchDbDocument(couchDb, dbName, restartNoteEntry.id);
 
-        await evaluate("await core.services.setting.applyPartial({readChunksOnline:false},true);return JSON.stringify(true);");
-        const uploadVerificationFetch = await evaluate<{ succeeded: boolean; error?: string }>([
-            "try{await core.rebuilder.fetchLocal(false,true);return JSON.stringify({succeeded:true});}",
-            "catch(error){return JSON.stringify({succeeded:false,error:String(error)});}",
-        ].join(""));
+        await evaluate(
+            "await core.services.setting.applyPartial({readChunksOnline:false},true);return JSON.stringify(true);"
+        );
+        const uploadVerificationFetch = await evaluate<{ succeeded: boolean; error?: string }>(
+            [
+                "try{await core.rebuilder.fetchLocal(false,true);return JSON.stringify({succeeded:true});}",
+                "catch(error){return JSON.stringify({succeeded:false,error:String(error)});}",
+            ].join("")
+        );
         assert.ok(
             uploadVerificationFetch.succeeded,
             `Standard Fetch after the upload failed: ${JSON.stringify(uploadVerificationFetch)}`
@@ -495,11 +512,15 @@ async function main(): Promise<void> {
         assert.equal(fetchedRestartNoteEntry.id, restartNoteEntry.id);
         assert.equal(fetchedRestartNoteEntry.rev, uploadedRestartNote.document._rev);
         assert.deepEqual(fetchedRestartNoteEntry.children, uploadedRestartNote.document.children);
-        const fetchedRestartNoteBody = await evaluate<string>([
-            "const file=await core.serviceModules.databaseFileAccess.fetch(" + JSON.stringify(restartNotePath) + ");",
-            "if(!file||file.deleted||!file.body)throw new Error('The uploaded note was not readable from the replaced local database.');",
-            "return JSON.stringify(await file.body.text());",
-        ].join(""));
+        const fetchedRestartNoteBody = await evaluate<string>(
+            [
+                "const file=await core.serviceModules.databaseFileAccess.fetch(" +
+                    JSON.stringify(restartNotePath) +
+                    ");",
+                "if(!file||file.deleted||!file.body)throw new Error('The uploaded note was not readable from the replaced local database.');",
+                "return JSON.stringify(await file.body.text());",
+            ].join("")
+        );
         assert.equal(
             fetchedRestartNoteBody,
             restartNoteContents,

@@ -9,7 +9,7 @@ import { startObsidianLiveSyncSession, type ObsidianLiveSyncSession } from "../r
 import { openLiveSyncSettings, waitForVisibleObsidianDialogue, withObsidianPage } from "../runner/ui.ts";
 import { createTemporaryVault } from "../runner/vault.ts";
 
-const coreExpression = "app.plugins.plugins['obsidian-livesync'].core";
+const coreExpression = "app.plugins.plugins['livesync-efficient'].core";
 const firstKey = "synthetic-first-configuration-key";
 const secondKey = "synthetic-second-configuration-key";
 const wrongSavedKey = "synthetic-wrong-saved-configuration-key";
@@ -316,7 +316,7 @@ async function main(): Promise<void> {
         assert.deepEqual(await readSecrets(cliBinary, session), secrets);
         await applyCustomKey(session, secondKey, false);
         console.log("Configuration encryption: restart and custom-key-only Apply preserved all protected values.");
-        const sourceDataPath = join(firstVault.path, ".obsidian/plugins/obsidian-livesync/data.json");
+        const sourceDataPath = join(firstVault.path, ".obsidian/plugins/livesync-efficient/data.json");
         const encryptedData = await readFile(sourceDataPath, "utf8");
         const saved = JSON.parse(encryptedData) as Record<string, unknown>;
         assert.equal(saved.configPassphraseStore, "LOCALSTORAGE");
@@ -345,7 +345,7 @@ async function main(): Promise<void> {
         session = undefined;
 
         secondVault = await createTemporaryVault("obsidian-livesync-configuration-copy-");
-        const copyDataPath = join(secondVault.path, ".obsidian/plugins/obsidian-livesync/data.json");
+        const copyDataPath = join(secondVault.path, ".obsidian/plugins/livesync-efficient/data.json");
         session = await startObsidianLiveSyncSession({
             binary,
             cliBinary,
@@ -380,8 +380,8 @@ async function main(): Promise<void> {
                             await evalObsidianJson(
                                 cliBinary,
                                 `(async()=>{
-                                await app.plugins.disablePlugin('obsidian-livesync');
-                                await app.plugins.enablePlugin('obsidian-livesync');
+                                await app.plugins.disablePlugin('livesync-efficient');
+                                await app.plugins.enablePlugin('livesync-efficient');
                                 return JSON.stringify(true);
                             })()`,
                                 cliEnv
@@ -469,7 +469,7 @@ async function main(): Promise<void> {
         session = undefined;
 
         retryVault = await createTemporaryVault("obsidian-livesync-configuration-wrong-saved-key-");
-        const retryDataPath = join(retryVault.path, ".obsidian/plugins/obsidian-livesync/data.json");
+        const retryDataPath = join(retryVault.path, ".obsidian/plugins/livesync-efficient/data.json");
         session = await startObsidianLiveSyncSession({
             binary,
             cliBinary,
@@ -500,8 +500,8 @@ async function main(): Promise<void> {
                             await evalObsidianJson(
                                 cliBinary,
                                 `(async()=>{
-                                await app.plugins.disablePlugin('obsidian-livesync');
-                                await app.plugins.enablePlugin('obsidian-livesync');
+                                await app.plugins.disablePlugin('livesync-efficient');
+                                await app.plugins.enablePlugin('livesync-efficient');
                                 return JSON.stringify(true);
                             })()`,
                                 cliEnv

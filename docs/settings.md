@@ -161,7 +161,7 @@ Following panes will be shown when you enable this setting.
 
 ### 1. Appearance
 
-For icon meanings, progress counters, and CSS snippets, see the [status display guide](tips/status-display.md).
+For icon meanings and progress counters, see the [status display guide](tips/status-display.md).
 
 #### Display Language
 
@@ -169,26 +169,6 @@ Setting key: displayLanguage
 
 You can change the display language. It is independent of the system language and/or Obsidian's language.
 Note: Not all messages have been translated. And, please revert to "Default" when reporting errors. Of course, your contribution to translation is always welcome!
-
-#### Show status inside the editor
-
-Setting key: showStatusOnEditor
-
-We can show the status of synchronisation inside the editor.
-
-Reflected after reboot
-
-#### Show status as icons only
-
-Setting key: showOnlyIconsOnEditor
-
-Show status as icons only. This is useful when you want to save space on the status bar.
-
-#### Show status on the status bar
-
-Setting key: showStatusOnStatusbar
-
-We can show the status of synchronisation on the status bar. (Default: On)
 
 #### Show status icon instead of file warnings banner
 

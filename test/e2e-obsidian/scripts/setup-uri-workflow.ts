@@ -464,7 +464,7 @@ async function readSetupState(cliBinary: string, environment: NodeJS.ProcessEnv)
         cliBinary,
         [
             "(()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const settings=core.services.setting.currentSettings();",
             "return JSON.stringify({",
             "configured:settings.isConfigured===true,",
@@ -514,7 +514,7 @@ async function enableHiddenFileSync(cliBinary: string, environment: NodeJS.Proce
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "await core.services.setting.applyPartial({",
             "syncInternalFiles:true,",
             "syncInternalFilesBeforeReplication:true,",
@@ -541,7 +541,7 @@ async function captureHiddenFileGuideSettings(
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "await core.services.setting.applyPartial({",
             "useAdvancedMode:true,",
             "syncInternalFilesTargetPatterns:'^\\\\.obsidian(?:$|/snippets(?:/|$))',",
@@ -607,7 +607,7 @@ async function scanHiddenStorage(cliBinary: string, environment: NodeJS.ProcessE
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const addOn=core.getAddOn('HiddenFileSync');",
             "await addOn.scanAllStorageChanges(true);",
             "return JSON.stringify({ok:true});",
@@ -623,7 +623,7 @@ async function scanHiddenDatabase(cliBinary: string, environment: NodeJS.Process
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const addOn=core.getAddOn('HiddenFileSync');",
             "await addOn.scanAllDatabaseChanges(true);",
             "return JSON.stringify({ok:true});",
@@ -715,7 +715,7 @@ async function verifyInterruptedFetchRestart(
     await withObsidianPage(port, async (page) => {
         await modalByTitle(page, "Data retrieval scheduled").waitFor({ state: "visible", timeout: uiTimeoutMs });
         await page.evaluate(() => {
-            const core = (globalThis as any).app.plugins.plugins["obsidian-livesync"].core;
+            const core = (globalThis as any).app.plugins.plugins["livesync-efficient"].core;
             core.rebuilder.$fetchLocalDBFast = async () => {
                 await core.rebuilder.resetLocalDatabase();
                 (globalThis as any).__fetchChoiceInterrupted = true;
@@ -727,7 +727,7 @@ async function verifyInterruptedFetchRestart(
     const pending = await withObsidianPage(port, async (page) => {
         await page.waitForFunction(
             () => {
-                const core = (globalThis as any).app.plugins.plugins["obsidian-livesync"].core;
+                const core = (globalThis as any).app.plugins.plugins["livesync-efficient"].core;
                 const settings = core.services.setting.currentSettings();
                 return (
                     (globalThis as any).__fetchChoiceInterrupted === true &&
@@ -740,7 +740,7 @@ async function verifyInterruptedFetchRestart(
         );
         return await page.evaluate(async () => {
             const app = (globalThis as any).app;
-            const core = app.plugins.plugins["obsidian-livesync"].core;
+            const core = app.plugins.plugins["livesync-efficient"].core;
             return {
                 markdown: await app.vault.adapter.read("flag_fetch.md"),
                 suffix: core.services.setting.currentSettings().additionalSuffixOfDatabaseName,
@@ -783,7 +783,7 @@ async function verifyInterruptedFetchRestart(
     await captureObsidianPage(port, "issue-1244-editable-fetch-flag.png", async () => undefined);
     await withObsidianPage(port, async (page) => {
         await page.evaluate(() =>
-            (globalThis as any).app.plugins.plugins["obsidian-livesync"].core.services.appLifecycle.performRestart()
+            (globalThis as any).app.plugins.plugins["livesync-efficient"].core.services.appLifecycle.performRestart()
         );
     });
     const title = unreadable ? "Saved fetch choices could not be read" : "Resume scheduled fetch?";
@@ -800,7 +800,7 @@ async function verifyInterruptedFetchRestart(
         if (unreadable) {
             await page.evaluate(async () => {
                 const app = (globalThis as any).app;
-                const core = app.plugins.plugins["obsidian-livesync"].core;
+                const core = app.plugins.plugins["livesync-efficient"].core;
                 const originalMarkdown = await app.vault.adapter.read("flag_fetch.md");
                 const fetch = core.rebuilder.$fetchLocalDBFast.bind(core.rebuilder);
                 core.rebuilder.$fetchLocalDBFast = async (...args: unknown[]) => {
@@ -942,7 +942,7 @@ async function main(): Promise<void> {
                         session.remoteDebuggingPort,
                         async (page) =>
                             await page.evaluate(() => {
-                                const core = (globalThis as any).app.plugins.plugins["obsidian-livesync"].core;
+                                const core = (globalThis as any).app.plugins.plugins["livesync-efficient"].core;
                                 return {
                                     suffix: core.services.setting.currentSettings().additionalSuffixOfDatabaseName,
                                     appId: core.services.API.getAppID(),

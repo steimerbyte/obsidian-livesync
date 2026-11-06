@@ -28,7 +28,7 @@ const controlFiles = {
     [`${controlRoot}/settings.json`]: '{"control":true}\n',
 };
 const allowList = "\\.(?:md|png|pdf)$";
-const coreCode = "const core=app.plugins.plugins['obsidian-livesync'].core;";
+const coreCode = "const core=app.plugins.plugins['livesync-efficient'].core;";
 const hiddenCode = `${coreCode}const addOn=core.getAddOn('HiddenFileSync');`;
 
 type Observation = { name: string; expected: unknown; actual: unknown; passed: boolean };

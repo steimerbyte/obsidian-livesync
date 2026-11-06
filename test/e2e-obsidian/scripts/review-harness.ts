@@ -98,7 +98,7 @@ async function captureReadinessFailure(
             cliBinary,
             [
                 "(async()=>{",
-                "const core=app.plugins.plugins['obsidian-livesync']?.core;",
+                "const core=app.plugins.plugins['livesync-efficient']?.core;",
                 "if(!core)return JSON.stringify({coreAvailable:false,unresolvedMessages:[]});",
                 "const settings=core.services.setting.currentSettings();",
                 "let unresolvedMessages=[];",
@@ -132,7 +132,7 @@ async function captureReadinessFailure(
             const opened = await page.evaluate(
                 (commandId) =>
                     (globalThis as ReviewHarnessTestGlobal).app?.commands?.executeCommandById(commandId) === true,
-                "obsidian-livesync:view-log"
+                "livesync-efficient:view-log"
             );
             if (!opened) throw new Error("The Show log command was not registered.");
             const logPane = page.locator(".logpane");
@@ -169,7 +169,7 @@ async function openHarness(): Promise<void> {
         return await page.evaluate(
             (commandId) =>
                 (globalThis as ReviewHarnessTestGlobal).app?.commands?.executeCommandById(commandId) === true,
-            "obsidian-livesync:open-review-harness"
+            "livesync-efficient:open-review-harness"
         );
     });
     if (!opened) throw new Error("The Review Harness command was not registered.");
@@ -215,7 +215,7 @@ async function runIdBenchmark(): Promise<void> {
     await withObsidianPage(obsidianRemoteDebuggingPort(), async (page) => {
         const snapshotSettings = () =>
             page.evaluate(() => {
-                const plugin = (globalThis as ReviewHarnessTestGlobal).app?.plugins?.plugins["obsidian-livesync"] as {
+                const plugin = (globalThis as ReviewHarnessTestGlobal).app?.plugins?.plugins["livesync-efficient"] as {
                     core: { services: { setting: { currentSettings(): unknown } } };
                 };
                 return JSON.stringify(plugin.core.services.setting.currentSettings());
@@ -260,7 +260,7 @@ async function runFileContentHashBenchmark(): Promise<void> {
     await withObsidianPage(obsidianRemoteDebuggingPort(), async (page) => {
         const snapshotSettings = () =>
             page.evaluate(() => {
-                const plugin = (globalThis as ReviewHarnessTestGlobal).app?.plugins?.plugins["obsidian-livesync"] as {
+                const plugin = (globalThis as ReviewHarnessTestGlobal).app?.plugins?.plugins["livesync-efficient"] as {
                     core: { services: { setting: { currentSettings(): unknown } } };
                 };
                 return JSON.stringify(plugin.core.services.setting.currentSettings());
@@ -356,7 +356,7 @@ async function restartAndResumeHarness(): Promise<string> {
     await withObsidianPage(obsidianRemoteDebuggingPort(), async (page) => {
         await page.waitForFunction(
             () => {
-                const plugin = (globalThis as ReviewHarnessTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+                const plugin = (globalThis as ReviewHarnessTestGlobal).app?.plugins?.plugins["livesync-efficient"];
                 if (typeof plugin !== "object" || plugin === null || !("core" in plugin)) return false;
                 const core = (plugin as { core: { services: { appLifecycle: { isReady(): boolean } } } }).core;
                 return core.services.appLifecycle.isReady();
@@ -373,7 +373,7 @@ async function restartAndResumeHarness(): Promise<string> {
             .locator('[data-testid="review-harness-resumed"]')
             .waitFor({ state: "visible", timeout: uiTimeoutMs });
         const continuationRemoved = await page.evaluate(async (stateKey) => {
-            const plugin = (globalThis as ReviewHarnessTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+            const plugin = (globalThis as ReviewHarnessTestGlobal).app?.plugins?.plugins["livesync-efficient"];
             if (typeof plugin !== "object" || plugin === null || !("core" in plugin)) {
                 throw new Error("Self-hosted LiveSync is unavailable after restart.");
             }
@@ -439,7 +439,7 @@ async function verifyMobileHarness(): Promise<string> {
         const harness = page.locator('[data-testid="review-harness"]');
         if (await harness.isVisible()) return;
         await page.evaluate(async (viewType) => {
-            const plugin = (globalThis as ReviewHarnessTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+            const plugin = (globalThis as ReviewHarnessTestGlobal).app?.plugins?.plugins["livesync-efficient"];
             if (typeof plugin !== "object" || plugin === null || !("core" in plugin)) {
                 throw new Error("Self-hosted LiveSync is unavailable in mobile test mode.");
             }

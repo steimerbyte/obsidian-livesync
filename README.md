@@ -118,11 +118,9 @@ If you would rather not set up and maintain a server yourself, the following pro
 
 Your synchronisation data will reside on a server operated by the provider. Consider whether that is acceptable for your Vault, and review the provider's current terms, pricing, and data-handling policies before using the service.
 
-## Status Bubble and Status Bar
+## Status Bubble
 
-A compact orb in the top-right of the active note shows the current LiveSync state — starting, ready, syncing, configuration sync, paused, offline, or error — with a continuously animated ring. Tap it to expand the live headline, pull/push progress, queue counts, and the **Sync now**, **Log**, and **Settings** actions. Manual-sync, governor, and debug notices appear in this card instead of separate notice cards or toasts.
-
-Synchronisation status is also shown in the status bar and inside the editor by default. The main indicators are:
+A compact 36 px orb in the top-right of the active note shows the current LiveSync state — starting, ready, syncing, configuration sync, paused, offline, or error — with a continuously animated ring. Tap it to expand the live headline, pull/push progress, queue counts, category health rows, the raw live log, and the **Sync now**, **Log**, and **Settings** actions. Manual-sync, governor, and debug notices appear in this card instead of separate notice cards or toasts. The bubble is the only status surface: there is no in-editor overlay and no status-bar item. The main indicators are:
 
 | Indicator | Meaning |
 | --- | --- |
@@ -137,7 +135,7 @@ Synchronisation status is also shown in the status bar and inside the editor by 
 
 <a id="customising-status-items-with-css-snippets"></a>
 
-See the [status display guide](docs/tips/status-display.md) for detailed progress counters and [CSS customisation](docs/tips/status-display.md#customising-status-items-with-css-snippets).
+See the [status display guide](docs/tips/status-display.md) for detailed progress counters and [CSS customisation](docs/tips/status-display.md#customising-the-bubble).
 
 Allow pending file operations to finish before closing Obsidian, especially after deleting or renaming files.
 
@@ -172,9 +170,8 @@ Measured on a local production build (`npm run build`, `gzip -6 main.js`):
 
 ### CPU and rendering
 
-- The in-editor status overlay re-renders at most every 250 ms on mobile (20 ms on desktop) instead of 50 times per second.
 - Document History debounces revision slider input by 275 ms, so dragging produces one diff instead of one per input event.
-- The status overlay no longer applies a grayscale filter, the sticky settings header uses an opaque background instead of a backdrop blur, and the warning band no longer runs an infinite background animation.
+- The sticky settings header uses an opaque background instead of a backdrop blur, and the warning band no longer runs an infinite background animation.
 
 ### Build
 

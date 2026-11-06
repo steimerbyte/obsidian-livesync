@@ -114,7 +114,7 @@ function createShutdownScript(options: {
     const fixtures = JSON.stringify(options);
     return `
         const fixtures=${fixtures};
-        const plugin=app.plugins.plugins["obsidian-livesync"];
+        const plugin=app.plugins.plugins["livesync-efficient"];
         const core=plugin?.core;
         require(core,"The LiveSync plug-in did not expose its core");
         const module=core.modules.find(candidate=>candidate.constructor.name==="ModuleLog");
@@ -229,7 +229,7 @@ function createShutdownScript(options: {
         };
 
         const run=async()=>{
-            state.disablePromise=app.plugins.disablePlugin("obsidian-livesync");
+            state.disablePromise=app.plugins.disablePlugin("livesync-efficient");
             state.disablePromise.catch(error=>{state.disableError=String(error);});
             await waitFor(()=>state.closeStarted,"The real local database close did not start");
             require(state.disposeCalls===0 && !state.disposeCompleted,
@@ -374,7 +374,7 @@ async function runCase(options: {
 
         await evaluate(
             session,
-            `await app.plugins.enablePlugin("obsidian-livesync"); return JSON.stringify({enabled:true});`
+            `await app.plugins.enablePlugin("livesync-efficient"); return JSON.stringify({enabled:true});`
         );
         await waitForLiveSyncCoreReady(options.cliBinary, session.cliEnv);
         const reload = await evaluate<Record<string, unknown>>(
@@ -382,7 +382,7 @@ async function runCase(options: {
             `
                 const state=app.__livesyncLogLifecycleState;
                 require(state,"The old core observation was not retained across plug-in reload");
-                const plugin=app.plugins.plugins["obsidian-livesync"];
+                const plugin=app.plugins.plugins["livesync-efficient"];
                 const core=plugin?.core;
                 require(core && core!==state.core,"Enabling the plug-in did not create a new core");
                 const module=core.modules.find(candidate=>candidate.constructor.name==="ModuleLog");

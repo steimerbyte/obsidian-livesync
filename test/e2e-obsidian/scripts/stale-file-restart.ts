@@ -34,7 +34,7 @@ async function readState(cliBinary: string, env: NodeJS.ProcessEnv): Promise<Fil
     return await evalObsidianJson<FileState[]>(
         cliBinary,
         `(async()=>{
-            const core=app.plugins.plugins['obsidian-livesync'].core;
+            const core=app.plugins.plugins['livesync-efficient'].core;
             const store=core.services.keyValueDB.openSimpleStore('file-reflection-provenance-v1');
             const states=[];
             for(const path of ${JSON.stringify([...paths, recoveredPath, legacyPath])}){
@@ -112,7 +112,7 @@ async function main(): Promise<void> {
         }>(
             cliBinary,
             `(async()=>{
-            const core=app.plugins.plugins['obsidian-livesync'].core;
+            const core=app.plugins.plugins['livesync-efficient'].core;
             const store=core.services.keyValueDB.openSimpleStore('file-reflection-provenance-v1');
             await core.services.fileProcessing.commitPendingFileEvents();
             const snapshot=[], current=[], original=[];
@@ -188,7 +188,7 @@ async function main(): Promise<void> {
         const receivedRevision = await evalObsidianJson<string>(
             cliBinary,
             `(async()=>{
-                const core=app.plugins.plugins['obsidian-livesync'].core;
+                const core=app.plugins.plugins['livesync-efficient'].core;
                 const path=${JSON.stringify(recoveredPath)};
                 const meta=await core.localDatabase.getDBEntryMeta(path,{},true);
                 const file=await core.storageAccess.getFileStub(path);
@@ -210,7 +210,7 @@ async function main(): Promise<void> {
         await evalObsidianJson(
             cliBinary,
             `(async()=>{
-            const core=app.plugins.plugins['obsidian-livesync'].core;
+            const core=app.plugins.plugins['livesync-efficient'].core;
             const path=${JSON.stringify(paths[1])};
             await core.services.keyValueDB.openSimpleStore('file-reflection-provenance-v1').delete(path);
             if(!await core.fileHandler.storeFileToDB(path)) throw new Error('Repeated save failed');
@@ -235,7 +235,7 @@ async function main(): Promise<void> {
         await evalObsidianJson(
             cliBinary,
             `(async()=>{
-                const core=app.plugins.plugins['obsidian-livesync'].core;
+                const core=app.plugins.plugins['livesync-efficient'].core;
                 core.settings.resolveConflictsByNewerFile=true;
                 await core.services.conflict.resolve(${JSON.stringify(paths[1])});
                 return JSON.stringify(true);

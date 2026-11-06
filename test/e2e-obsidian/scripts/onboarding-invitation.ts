@@ -45,7 +45,7 @@ async function inspectUnconfiguredStartup(
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             `const markerPath=${JSON.stringify(markerPath)};`,
             "let entry=false;",
             "try{entry=await core.localDatabase.getDBEntry(markerPath,undefined,false,false);}catch{}",

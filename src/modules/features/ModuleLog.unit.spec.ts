@@ -41,6 +41,7 @@ async function createHarness() {
             onSettingLoaded: allFunction<() => Promise<boolean>>(),
             onLoaded: allFunction<() => Promise<boolean>>(),
             onBeforeUnload: allFunction<() => Promise<boolean>>(),
+            getUnresolvedMessages: async () => [],
         },
         vault: { getVaultName: () => "test-vault" },
     };
@@ -48,7 +49,6 @@ async function createHarness() {
     const module = new ModuleLog({ app: {} } as never, core as never);
     const sink = vi.spyOn(module, "__addLog").mockImplementation(() => undefined);
     vi.spyOn(module, "observeForLogs").mockImplementation(() => undefined);
-    vi.spyOn(module, "adjustStatusDivPosition").mockImplementation(() => undefined);
     module.onBindFunction(core as never, services as never);
     const { Logger } = await import("octagonal-wheels/common/logger");
     return { module, services, core, sink, Logger };
@@ -317,7 +317,7 @@ describe("ModuleLog service connection", () => {
     );
 });
 
-describe("ModuleLog on-editor log history", () => {
+describe("ModuleLog log retention", () => {
     beforeEach(() => {
         vi.resetModules();
         vi.stubGlobal("document", { querySelectorAll: () => [] });
@@ -327,55 +327,38 @@ describe("ModuleLog on-editor log history", () => {
         vi.useRealTimers();
     });
 
-    it("does not collect log lines while the longer log is disabled", async () => {
+    it("always publishes the warning lines", async () => {
+        const { module, core } = await createHarness();
+        core.settings = {} as never;
+        module.activeFileStatus.value = "Not synchronised: test";
+
+        await module.updateMessageArea();
+
+        expect(module.statusMessages.value).toBe("⚠️ Not synchronised: test");
+    });
+
+    it("keeps the rolling log bounded without any display setting", async () => {
         const { module, core, sink } = await createHarness();
         sink.mockRestore(); // call the real __addLog
-        core.settings = { showLongerLogInsideEditor: false } as never;
-        for (let i = 0; i < 300; i++) module.__addLog(`message ${i}`, LOG_LEVEL_INFO);
-        expect(module.logLines).toHaveLength(0);
-        core.settings = {} as never; // shipped default path, property absent
-        for (let i = 0; i < 300; i++) module.__addLog(`message ${i}`, LOG_LEVEL_INFO);
-        expect(module.logLines).toHaveLength(0);
-    });
-
-    it("keeps the longer log bounded while it is enabled", async () => {
-        const { module, core, sink } = await createHarness();
-        sink.mockRestore();
-        core.settings = { showLongerLogInsideEditor: true } as never;
+        core.settings = {} as never;
         for (let i = 0; i < 300; i++) module.__addLog(`message ${i}`, LOG_LEVEL_INFO);
         expect(module.logLines).toHaveLength(200);
-        expect(module.logLines[0].message).toContain("message 100");
-        expect(module.logLines[199].message).toContain("message 299");
+        expect(module.logLines[0]).toContain("message 100");
+        expect(module.logLines[199]).toContain("message 299");
     });
 
-    it("renders the live history newest-first and drops expired entries", async () => {
+    it("clears the status log three seconds after it is refreshed", async () => {
         vi.useFakeTimers();
-        vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
-            callback();
-            return 1;
-        });
         const { module, core, sink } = await createHarness();
         sink.mockRestore();
-        core.settings = {
-            showLongerLogInsideEditor: true,
-            showStatusOnEditor: true,
-            showOnlyIconsOnEditor: false,
-        } as never;
-        module.statusBarLabels = {
-            value: { message: "", status: "", parts: [], statusBarParts: [] },
-        } as never;
-        module.statusDiv = { setCssStyles: vi.fn() } as never;
-        module.logHistory = { innerText: "" } as unknown as HTMLDivElement;
-        module.logMessage = { innerText: "" } as never;
-        module.logLines.unshift({ ttl: 0, message: "expired" });
-        module.__addLog("first", LOG_LEVEL_INFO);
-        module.__addLog("second", LOG_LEVEL_INFO);
+        core.settings = {} as never;
+        module.__addLog("daily sync finished", LOG_LEVEL_INFO);
+        expect(module.statusLog.value).toBe("daily sync finished");
+
         module.applyStatusBarText();
-        expect(module.logLines).toHaveLength(2);
-        expect(module.logLines.some((e) => e.message === "expired")).toBe(false);
-        const rendered = module.logHistory!.innerText.split("\n");
-        expect(rendered).toHaveLength(2);
-        expect(rendered[0]).toContain("second");
-        expect(rendered[1]).toContain("first");
+        vi.advanceTimersByTime(2999);
+        expect(module.statusLog.value).toBe("daily sync finished");
+        vi.advanceTimersByTime(1);
+        expect(module.statusLog.value).toBe("");
     });
 });

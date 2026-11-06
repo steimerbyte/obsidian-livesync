@@ -54,7 +54,7 @@ interface IntegrityReport {
 async function localState(cli: string, session: ObsidianLiveSyncSession) {
     const state = await evalObsidianJson<unknown>(
         cli,
-        "(async()=>{const core=app.plugins.plugins['obsidian-livesync'].core;const files=await Promise.all(app.vault.getFiles().map(async file=>[file.path,await app.vault.read(file)]));files.sort((a,b)=>a[0].localeCompare(b[0]));return JSON.stringify({sequence:(await core.localDatabase.localDatabase.info()).update_seq,settings:core.services.setting.currentSettings(),files});})()",
+        "(async()=>{const core=app.plugins.plugins['livesync-efficient'].core;const files=await Promise.all(app.vault.getFiles().map(async file=>[file.path,await app.vault.read(file)]));files.sort((a,b)=>a[0].localeCompare(b[0]));return JSON.stringify({sequence:(await core.localDatabase.localDatabase.info()).update_seq,settings:core.services.setting.currentSettings(),files});})()",
         session.cliEnv
     );
     return createHash("sha256").update(JSON.stringify(state)).digest("hex");
@@ -76,7 +76,7 @@ async function observeRequests(cli: string, session: ObsidianLiveSyncSession) {
     await evalObsidianJson(
         cli,
         `(() => {
-            const api=app.plugins.plugins['obsidian-livesync'].core.services.API;
+            const api=app.plugins.plugins['livesync-efficient'].core.services.API;
             const state={calls:[],restore:undefined};
             const originals={};
             for(const name of ['webCompatFetch','nativeFetch']) {
@@ -151,7 +151,7 @@ async function runCase(config: CouchDbConfig, encrypted: boolean) {
         if (encrypted) assert.ok(!JSON.stringify(original).includes(fixturePath));
         const shadowId = await evalObsidianJson<string>(
             cli,
-            "(async()=>JSON.stringify(await app.plugins.plugins['obsidian-livesync'].core.services.path.path2id('Diagnostic/different-identity.md')))()",
+            "(async()=>JSON.stringify(await app.plugins.plugins['livesync-efficient'].core.services.path.path2id('Diagnostic/different-identity.md')))()",
             session.cliEnv
         );
         const shadow = { ...original, _id: shadowId };
@@ -161,7 +161,7 @@ async function runCase(config: CouchDbConfig, encrypted: boolean) {
         for (const native of [false, true]) {
             await evalObsidianJson(
                 cli,
-                `(async()=>{await app.plugins.plugins['obsidian-livesync'].core.services.setting.applyPartial({useRequestAPI:${native}});return JSON.stringify(true);})()`,
+                `(async()=>{await app.plugins.plugins['livesync-efficient'].core.services.setting.applyPartial({useRequestAPI:${native}});return JSON.stringify(true);})()`,
                 session.cliEnv
             );
             const localBefore = await localState(cli, session);
@@ -172,7 +172,7 @@ async function runCase(config: CouchDbConfig, encrypted: boolean) {
                 await withObsidianPage(session.remoteDebuggingPort, async (page) => {
                     await page.setViewportSize({ width: 800, height: 600 });
                     const opened = await page.evaluate(
-                        "app.commands.executeCommandById('obsidian-livesync:inspect-database-integrity')"
+                        "app.commands.executeCommandById('livesync-efficient:inspect-database-integrity')"
                     );
                     assert.equal(opened, true);
                     const dialogue = page.locator(".database-diagnostic");
@@ -239,7 +239,7 @@ async function runCase(config: CouchDbConfig, encrypted: boolean) {
                     await page.setViewportSize({ width: 800, height: 600 });
                     for (const names of ["pseudonym", "original"]) {
                         const opened = await page.evaluate(
-                            "app.commands.executeCommandById('obsidian-livesync:inspect-database-integrity')"
+                            "app.commands.executeCommandById('livesync-efficient:inspect-database-integrity')"
                         );
                         assert.equal(opened, true);
                         const dialogue = page.locator(".database-diagnostic");

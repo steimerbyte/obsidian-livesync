@@ -55,7 +55,7 @@ async function configureSettingMarkdown(
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "await core.services.setting.applyExternalSettings({",
             `settingSyncFile:${JSON.stringify(settingPath)},`,
             "writeCredentialsForSettingSync:false,",
@@ -101,7 +101,7 @@ async function configureObjectStorageSettingMarkdown(cliBinary: string, env: Nod
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             `await core.services.setting.applyExternalSettings(${JSON.stringify(settings)},true);`,
             "await core.services.setting.saveSettingData();",
             "return JSON.stringify({ok:true});",
@@ -142,7 +142,7 @@ async function main(): Promise<void> {
         ]);
 
         const persisted = JSON.parse(
-            await readFile(join(vault.path, ".obsidian", "plugins", "obsidian-livesync", "data.json"), "utf-8")
+            await readFile(join(vault.path, ".obsidian", "plugins", "livesync-efficient", "data.json"), "utf-8")
         ) as {
             idDerivationVersion?: unknown;
             idDerivationKey?: unknown;
@@ -193,7 +193,7 @@ async function main(): Promise<void> {
             objectStorageVault.path,
             ".obsidian",
             "plugins",
-            "obsidian-livesync",
+            "livesync-efficient",
             "data.json"
         );
         const persistedObjectStorage = JSON.parse(await readFile(objectStorageDataPath, "utf-8")) as Record<
@@ -251,7 +251,7 @@ async function main(): Promise<void> {
             cli.binary,
             [
                 "(()=>{",
-                "const settings=app.plugins.plugins['obsidian-livesync'].core.settings;",
+                "const settings=app.plugins.plugins['livesync-efficient'].core.settings;",
                 "return JSON.stringify({",
                 "remoteType:settings.remoteType,",
                 "couchDB_URI:settings.couchDB_URI,",

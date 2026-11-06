@@ -32,7 +32,7 @@ async function main(): Promise<void> {
         await new Promise((resolve) => setTimeout(resolve, 3000));
         if (process.env.E2E_OBSIDIAN_RELOAD_PLUGIN === "true") {
             await runObsidianCli(cli.binary, ["eval", "code=(async()=>app.plugins.setEnable(true))()"], cliEnv);
-            await runObsidianCli(cli.binary, ["plugin:reload", "id=obsidian-livesync"], cliEnv);
+            await runObsidianCli(cli.binary, ["plugin:reload", "id=livesync-efficient"], cliEnv);
         }
         const cliArgs = process.argv.slice(2);
         const result = await runObsidianCli(cli.binary, cliArgs.length > 0 ? cliArgs : ["--help"], cliEnv);

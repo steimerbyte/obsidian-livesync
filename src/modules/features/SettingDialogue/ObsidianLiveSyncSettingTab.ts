@@ -437,7 +437,6 @@ export class ObsidianLiveSyncSettingTab extends PluginSettingTab {
             void this.requestReload().catch((error: unknown) => Logger(error, LOG_LEVEL_NOTICE));
         });
         this.addOnSaved("displayLanguage", () => this.requestCatalogueRefresh());
-        this.addOnSaved("showStatusOnEditor", () => eventHub.emitEvent(EVENT_ON_UNRESOLVED_ERROR));
         this.addOnSaved("networkWarningStyle", () => eventHub.emitEvent(EVENT_ON_UNRESOLVED_ERROR));
         this.addOnSaved("useAdvancedMode", () => this.requestCatalogueRefresh());
         this.addOnSaved("usePowerUserMode", () => this.requestCatalogueRefresh());
@@ -723,7 +722,6 @@ export class ObsidianLiveSyncSettingTab extends PluginSettingTab {
     private getDeclarativeSettingSpec(key: string): SettingSpec {
         const spec = [
             ...createGeneralSettingSpecGroups({
-                showEditorStatusDetails: () => this.isConfiguredAs("showStatusOnEditor", true),
                 showVerboseLog: () => this.isConfiguredAs("lessInformationInLog", false),
             }),
             createExtraMenuSettingSpecGroup(),
@@ -889,7 +887,6 @@ export class ObsidianLiveSyncSettingTab extends PluginSettingTab {
 
     private createGeneralSettingsGroup(): SettingDefinitionGroup {
         const groups = createGeneralSettingDefinitionGroups({
-            showEditorStatusDetails: () => this.isConfiguredAs("showStatusOnEditor", true),
             showVerboseLog: () => this.isConfiguredAs("lessInformationInLog", false),
         });
         const [appearance, logging, fileIdentity] = groups;

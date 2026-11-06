@@ -50,8 +50,8 @@ The runner should:
 
 - Create one or more temporary vault directories.
 - Build the plug-in once with `npm run build` or a narrower production build command.
-- Install `main.js`, `manifest.json`, and `styles.css` when present into `.obsidian/plugins/obsidian-livesync/`.
-- Prepare `.obsidian/community-plugins.json` and `.obsidian/plugins/obsidian-livesync/data.json` as needed.
+- Install `main.js`, `manifest.json`, and `styles.css` when present into `.obsidian/plugins/livesync-efficient/`.
+- Prepare `.obsidian/community-plugins.json` and `.obsidian/plugins/livesync-efficient/data.json` as needed.
 - Launch Obsidian against the temporary vault.
 - Wait until the plug-in reports readiness through a deterministic probe.
 - Drive assertions through a narrow control channel rather than fragile visual selectors wherever possible.
@@ -80,7 +80,7 @@ Possible bridge options:
 - A file-based bridge in the vault, where Obsidian writes status files and consumes command files.
 - A DevTools protocol bridge if Obsidian exposes a stable debugging port in the test environment.
 
-The first implementation uses Obsidian's CLI for orchestration and readiness checks. The CLI handles vault opening through `obsidian://open?path=...`, enables community plug-ins through `app.plugins.setEnable(true)`, reloads Self-hosted LiveSync through `plugin:reload id=obsidian-livesync`, and verifies that `app.plugins.plugins['obsidian-livesync']` is loaded.
+The first implementation uses Obsidian's CLI for orchestration and readiness checks. The CLI handles vault opening through `obsidian://open?path=...`, enables community plug-ins through `app.plugins.setEnable(true)`, reloads Self-hosted LiveSync through `plugin:reload id=livesync-efficient`, and verifies that `app.plugins.plugins['livesync-efficient']` is loaded.
 
 This keeps E2E-only behaviour out of the production plug-in bundle. The runner should not require Self-hosted LiveSync to write marker files or expose a test server merely to prove that Obsidian loaded it.
 

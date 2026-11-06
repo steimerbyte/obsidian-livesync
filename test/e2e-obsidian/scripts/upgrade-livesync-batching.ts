@@ -22,8 +22,17 @@ import {
     waitForLocalDatabaseEntry,
 } from "../runner/liveSyncWorkflow.ts";
 import { ensurePinnedReleaseArtifact, type PinnedPluginRelease } from "../runner/releaseArtifact.ts";
-import { startObsidianLiveSyncSession, type ObsidianLiveSyncSession } from "../runner/session.ts";
-import { readRuntimeUpgradeState, waitForPersistentNodeIdentity } from "../runner/upgradeWorkflow.ts";
+import {
+    FORK_PLUGIN_ID,
+    liveSyncPluginLookup,
+    startObsidianLiveSyncSession,
+    type ObsidianLiveSyncSession,
+} from "../runner/session.ts";
+import {
+    migratePluginFolder,
+    readRuntimeUpgradeState,
+    waitForPersistentNodeIdentity,
+} from "../runner/upgradeWorkflow.ts";
 import { createTemporaryVault, type TemporaryVault } from "../runner/vault.ts";
 
 const sourceRelease: PinnedPluginRelease = {
@@ -84,7 +93,7 @@ async function main(): Promise<void> {
     const sourceRoot = await ensurePinnedReleaseArtifact(sourceRelease);
     const targetRoot = resolve(process.env.E2E_LIVESYNC_TARGET_ARTIFACT_ROOT?.trim() || process.cwd());
     const targetManifest = JSON.parse(await readFile(join(targetRoot, "manifest.json"), "utf8"));
-    if (targetManifest.id !== sourceRelease.pluginId || targetManifest.version === sourceRelease.version) {
+    if (targetManifest.id !== FORK_PLUGIN_ID || targetManifest.version === sourceRelease.version) {
         throw new Error("The target must be a newer Self-hosted LiveSync build.");
     }
     const hashes = await artefactHashes(targetRoot);
@@ -118,10 +127,13 @@ async function main(): Promise<void> {
     }
 
     async function start(currentVault: TemporaryVault, artifactRoot: string, seed = false): Promise<void> {
+        const pluginId = artifactRoot === sourceRoot ? sourceRelease.pluginId : FORK_PLUGIN_ID;
+        if (pluginId === FORK_PLUGIN_ID) await migratePluginFolder(currentVault, sourceRelease.pluginId);
         session = await startObsidianLiveSyncSession({
             binary,
             cliBinary,
             vault: currentVault,
+            pluginId,
             artifactRoot,
             pluginStartup: seed ? undefined : "natural",
             pluginData: seed ? pluginData : undefined,
@@ -135,7 +147,7 @@ async function main(): Promise<void> {
         return await evalObsidianJson<T>(
             cliBinary,
             `(async()=>{
-            const core=app.plugins.plugins['obsidian-livesync'].core;
+            const core=${liveSyncPluginLookup(session.cliEnv)}.core;
             return JSON.stringify(await(async()=>{${body}})());
         })()`,
             session.cliEnv
@@ -216,7 +228,7 @@ async function main(): Promise<void> {
         await assertNote(vault, beforePath, beforeContent);
         await stop();
         const savedOldData = JSON.parse(
-            await readFile(join(vault.path, ".obsidian/plugins/obsidian-livesync/data.json"), "utf8")
+            await readFile(join(vault.path, ".obsidian/plugins", sourceRelease.pluginId, "data.json"), "utf8")
         );
         assertEqual(
             Object.prototype.hasOwnProperty.call(savedOldData, "batchSaveInLiveSync"),

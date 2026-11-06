@@ -39,7 +39,7 @@ describe("paneGeneral", () => {
         };
 
         paneGeneral.call(host as never, {} as HTMLElement, { addPanel } as never);
-        await vi.waitFor(() => expect(settingHarness.rendered).toHaveLength(14));
+        await vi.waitFor(() => expect(settingHarness.rendered).toHaveLength(11));
 
         expect(addPanel.mock.calls.map(([, heading]) => heading)).toEqual([
             "obsidianLiveSyncSettingTab.titleAppearance",

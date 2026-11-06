@@ -171,14 +171,14 @@ async function assertIndependentIdKey(
     const matches = await evalObsidianJson<boolean>(
         context.cliBinary,
         `(() => {
-        const settings = app.plugins.plugins['obsidian-livesync'].core.services.setting.currentSettings();
+        const settings = app.plugins.plugins['livesync-efficient'].core.services.setting.currentSettings();
         return JSON.stringify(settings.encrypt && settings.usePathObfuscation &&
             settings.idDerivationVersion === 1 && settings.idDerivationKey === ${JSON.stringify(expectedKey)});
     })()`,
         session.cliEnv
     );
     assertEqual(matches, true, "The device did not retain the shared independent ID key and Path Obfuscation.");
-    const raw = await readFile(join(vault.path, ".obsidian/plugins/obsidian-livesync/data.json"), "utf8");
+    const raw = await readFile(join(vault.path, ".obsidian/plugins/livesync-efficient/data.json"), "utf8");
     const saved = JSON.parse(raw) as Record<string, unknown>;
     assertEqual(saved.idDerivationVersion, 1, "The independent ID version was not saved.");
     assertEqual(saved.idDerivationKey, "", "The ID key was saved in plain text.");
@@ -272,7 +272,7 @@ async function configureMigratedStartupScheduling(
         cliBinary,
         [
             "(async()=>{",
-            "const plugin=app.plugins.plugins['obsidian-livesync'];",
+            "const plugin=app.plugins.plugins['livesync-efficient'];",
             "const core=plugin.core;",
             // Persist only the migration-shaped scheduling flags and leave the
             // generated URI unchanged. Device A stops before B creates the
@@ -329,7 +329,7 @@ async function importQRCode(port: number, qrData: string): Promise<string> {
                     };
                 };
             };
-            const setup = obsidian.app.plugins.plugins["obsidian-livesync"].core.modules.find(
+            const setup = obsidian.app.plugins.plugins["livesync-efficient"].core.modules.find(
                 (module) => typeof module.decodeQR === "function"
             );
             if (!setup?.decodeQR) throw new Error("The QR settings decoder is unavailable.");
@@ -431,7 +431,7 @@ async function main(): Promise<void> {
         const qrSettings = useQRCode
             ? await evalObsidianJson<ObsidianLiveSyncSettings>(
                   context.cliBinary,
-                  "JSON.stringify(app.plugins.plugins['obsidian-livesync'].core.services.setting.currentSettings())",
+                  "JSON.stringify(app.plugins.plugins['livesync-efficient'].core.services.setting.currentSettings())",
                   sessionA.cliEnv
               )
             : undefined;
@@ -595,7 +595,7 @@ async function main(): Promise<void> {
                     await evalObsidianJson(
                         context.cliBinary,
                         `(()=>{
-                    const core=app.plugins.plugins['obsidian-livesync'].core;
+                    const core=app.plugins.plugins['livesync-efficient'].core;
                     const settings=core.services.setting.currentSettings();
                     return JSON.stringify({configured:settings.isConfigured,
                         databaseReady:core.services.database.isDatabaseReady(),appReady:core.services.appLifecycle.isReady(),

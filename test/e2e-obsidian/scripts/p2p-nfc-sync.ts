@@ -313,7 +313,7 @@ async function readEntryState(
             "const path=" + JSON.stringify(path) + ";",
             "const revision=" + JSON.stringify(revision ?? null) + ";",
             "const documentId=" + JSON.stringify(documentId ?? null) + ";",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const entry=documentId?await core.localDatabase.getDBEntryFromMeta(await core.localDatabase.getRaw(documentId,revision?{rev:revision}:undefined),false,true):await core.localDatabase.getDBEntry(path,revision?{rev:revision}:undefined,false,true,true);",
             "if(!entry||!entry._id||!entry._rev) throw new Error('Metadata was not available at '+path);",
             "const children=Array.isArray(entry.children)?entry.children:[];",
@@ -368,7 +368,7 @@ async function readCurrentSettings(
         cliBinary,
         [
             "(async()=>{",
-            "const settings=app.plugins.plugins['obsidian-livesync'].core.services.setting.currentSettings();",
+            "const settings=app.plugins.plugins['livesync-efficient'].core.services.setting.currentSettings();",
             "const expectedIdKey=" + JSON.stringify(expectedIdKey) + ";",
             "return JSON.stringify({pathNormalizationVersion:settings.pathNormalizationVersion??0,encrypt:settings.encrypt,usePathObfuscation:settings.usePathObfuscation,idDerivationVersion:settings.idDerivationVersion??0,idKeyMatches:settings.idDerivationKey===expectedIdKey,p2pEnabled:settings.P2P_Enabled});",
             "})()",
@@ -415,7 +415,7 @@ async function executeCommand(port: number, commandId: string): Promise<void> {
 }
 
 async function openP2PStatus(port: number): Promise<void> {
-    await executeCommand(port, "obsidian-livesync:open-p2p-server-status");
+    await executeCommand(port, "livesync-efficient:open-p2p-server-status");
     await withObsidianPage(port, async (page) => {
         const heading = page.getByRole("heading", { name: "Signalling Status" }).last();
         await heading.waitFor({ state: "visible", timeout: uiTimeoutMs });
@@ -429,7 +429,7 @@ async function openP2PStatus(port: number): Promise<void> {
 }
 
 async function reconnectP2PStatus(port: number): Promise<void> {
-    await executeCommand(port, "obsidian-livesync:open-p2p-server-status");
+    await executeCommand(port, "livesync-efficient:open-p2p-server-status");
     await withObsidianPage(port, async (page) => {
         const heading = page.getByRole("heading", { name: "Signalling Status" }).last();
         await heading.waitFor({ state: "visible", timeout: uiTimeoutMs });
@@ -575,7 +575,7 @@ async function readMetadataIds(
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const rows=(await core.localDatabase.allDocsRaw({include_docs:true})).rows;",
             "const entries=rows.map(row=>row.doc).filter(doc=>doc&&Array.isArray(doc.children)&&typeof doc._id==='string'&&!doc._deleted);",
             "return JSON.stringify({ids:entries.map(entry=>entry._id),paths:entries.map(entry=>typeof entry.path==='string'?entry.path.normalize('NFC'):'')});",
@@ -604,7 +604,7 @@ async function seedLegacyNfdMetadata(
         context.cliBinary,
         [
             "(async()=>{",
-            "const db=app.plugins.plugins['obsidian-livesync'].core.localDatabase.localDatabase;",
+            "const db=app.plugins.plugins['livesync-efficient'].core.localDatabase.localDatabase;",
             "const original=await db.get(" + JSON.stringify(currentId) + ");",
             "const legacy={...original,_id:" + JSON.stringify(legacyId) + ",path:" + JSON.stringify(pathNfd) + "};",
             "delete legacy._rev;delete legacy._revisions;delete legacy._conflicts;",
@@ -630,7 +630,7 @@ async function startReconstruction(
         cliBinary,
         [
             "(()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "globalThis.__p2pNfcReconstruction={done:false,error:null};",
             "void(async()=>{",
             "await core.services.setting.applyPartial({pathNormalizationVersion:" + pathNormalizationVersion + "});",

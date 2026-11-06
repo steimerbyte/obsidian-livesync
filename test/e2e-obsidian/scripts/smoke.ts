@@ -25,7 +25,7 @@ async function assertMenuFeaturesAreComposed(remoteDebuggingPort: number): Promi
     await withObsidianPage(remoteDebuggingPort, async (page) => {
         const registered = await page.evaluate((commandIds) => {
             const commands = (globalThis as ObsidianCommandHost).app?.commands?.commands ?? {};
-            return commandIds.filter((id) => commands[`obsidian-livesync:${id}`] !== undefined);
+            return commandIds.filter((id) => commands[`livesync-efficient:${id}`] !== undefined);
         }, BASIC_COMMAND_IDS);
         if (registered.length !== BASIC_COMMAND_IDS.length) {
             const missing = BASIC_COMMAND_IDS.filter((id) => !registered.includes(id));

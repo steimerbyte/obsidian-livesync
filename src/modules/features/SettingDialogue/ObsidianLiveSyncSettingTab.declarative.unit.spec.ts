@@ -349,9 +349,6 @@ describe("ObsidianLiveSyncSettingTab native page lifecycle", () => {
             appearance?.items?.flatMap((item) => ("control" in item && item.control ? [item.control.key] : []))
         ).toEqual([
             "displayLanguage",
-            "showStatusOnEditor",
-            "showOnlyIconsOnEditor",
-            "showStatusOnStatusbar",
             "hideFileWarningNotice",
             "syncGuardEnabled",
             "syncGuardMinimumFiles",

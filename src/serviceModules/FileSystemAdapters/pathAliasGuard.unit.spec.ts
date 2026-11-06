@@ -21,7 +21,7 @@ const REFUSAL = "Refusing a path which reaches an existing entry by a name its f
 const CONFIG_DIRECTORY = ".obsidian";
 const PLUGIN_DIRECTORY = `${CONFIG_DIRECTORY}/plugins/obsidian-livesync`;
 const PLUGIN_ENTRY = `${PLUGIN_DIRECTORY}/main.js`;
-const DIRECTORY_ALIAS_ENTRY = "OBSIDI~1/plugins/obsidian-livesync/main.js";
+const DIRECTORY_ALIAS_ENTRY = "OBSIDI~1/plugins/livesync-efficient/main.js";
 const FILE_ALIAS_ENTRY = `${PLUGIN_DIRECTORY}/MAIN~1.JS`;
 
 const fold = (value: string) => value.normalize("NFC").toLowerCase();

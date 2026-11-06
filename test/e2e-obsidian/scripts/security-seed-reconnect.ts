@@ -287,7 +287,7 @@ async function pauseAutomaticReplication(cliBinary: string, env: NodeJS.ProcessE
         cliBinary,
         [
             "(()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "core.services.replicator.getActiveReplicator()?.closeReplication();",
             "const settings=core.services.setting.currentSettings();",
             "return JSON.stringify({",
@@ -315,7 +315,7 @@ async function cachedSecuritySeedFingerprint(cliBinary: string, env: NodeJS.Proc
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const settings=core.services.setting.currentSettings();",
             "const replicator=core.services.replicator.getActiveReplicator();",
             "const seed=await replicator.getReplicationPBKDF2Salt(settings,false);",
@@ -437,7 +437,7 @@ async function inspectSessionHealth(cliBinary: string, env: NodeJS.ProcessEnv): 
         [
             "(async()=>{",
             `const patterns=${JSON.stringify(hkdfErrorMessages)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "await core.services.API.showWindow('log-log');",
             "const sleep=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms));",
             "let text='';",

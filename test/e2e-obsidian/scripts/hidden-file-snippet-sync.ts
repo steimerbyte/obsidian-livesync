@@ -195,7 +195,7 @@ async function assertDisabledInitialisationIsNoOp(
             [
                 "(async()=>{",
                 `const targetFiles=${JSON.stringify([snippetPath, mergeJsonPath])};`,
-                "const core=app.plugins.plugins['obsidian-livesync'].core;",
+                "const core=app.plugins.plugins['livesync-efficient'].core;",
                 "const addOn=core.getAddOn('HiddenFileSync');",
                 "const snapshot=async()=>{",
                 "const files=await addOn.getAllDatabaseFiles();",
@@ -280,7 +280,7 @@ async function scanHiddenStorage(cliBinary: string, env: NodeJS.ProcessEnv): Pro
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const addOn=core.getAddOn('HiddenFileSync');",
             "await addOn.scanAllStorageChanges(true);",
             "return JSON.stringify({ok:true});",
@@ -295,7 +295,7 @@ async function scanHiddenDatabase(cliBinary: string, env: NodeJS.ProcessEnv): Pr
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const addOn=core.getAddOn('HiddenFileSync');",
             "await addOn.scanAllDatabaseChanges(true);",
             "return JSON.stringify({ok:true});",
@@ -311,7 +311,7 @@ async function resolveHiddenConflicts(cliBinary: string, env: NodeJS.ProcessEnv)
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const addOn=core.getAddOn('HiddenFileSync');",
             "await addOn.resolveConflictOnInternalFiles();",
             "await addOn.scanAllDatabaseChanges(true);",
@@ -333,7 +333,7 @@ async function startHiddenConflictResolution(cliBinary: string, env: NodeJS.Proc
             "globalThis[key]=state;",
             `const comparison=globalThis[${JSON.stringify(hiddenConflictComparisonStateKey)}];`,
             "if(comparison)comparison.operation=state;",
-            "const addOn=app.plugins.plugins['obsidian-livesync'].core.getAddOn('HiddenFileSync');",
+            "const addOn=app.plugins.plugins['livesync-efficient'].core.getAddOn('HiddenFileSync');",
             "void addOn.resolveConflictOnInternalFiles().then(",
             "()=>{state.done=true;},",
             "error=>{state.error=String(error);state.done=true;}",
@@ -364,7 +364,7 @@ async function installHiddenJsonComparisonObserver(cliBinary: string, env: NodeJ
         [
             "(()=>{",
             `const key=${JSON.stringify(hiddenConflictComparisonStateKey)};`,
-            "const addOn=app.plugins.plugins['obsidian-livesync'].core.getAddOn('HiddenFileSync');",
+            "const addOn=app.plugins.plugins['livesync-efficient'].core.getAddOn('HiddenFileSync');",
             "const original=addOn.showJSONMergeDialogAndMerge;",
             "if(typeof original!=='function')throw new Error('Hidden File Sync JSON comparison method is unavailable');",
             "const state={calls:[],original,operation:null};",
@@ -438,7 +438,7 @@ async function assertResolvedHiddenContent(
         [
             "(async()=>{",
             `const path=${JSON.stringify(path)};`,
-            "const db=app.plugins.plugins['obsidian-livesync'].core.localDatabase;",
+            "const db=app.plugins.plugins['livesync-efficient'].core.localDatabase;",
             "const entry=await db.getDBEntry(`i:${path}`);",
             "if(!entry)throw new Error(`Resolved hidden file is missing: ${path}`);",
             "const current=await db.getRaw(entry._id,{conflicts:true});",
@@ -478,7 +478,7 @@ async function readHiddenConflictLeaves(
         [
             "(async()=>{",
             `const path=${JSON.stringify(path)};`,
-            "const db=app.plugins.plugins['obsidian-livesync'].core.localDatabase;",
+            "const db=app.plugins.plugins['livesync-efficient'].core.localDatabase;",
             "const entry=await db.getDBEntry(`i:${path}`);",
             "if(!entry)throw new Error(`Hidden conflict entry is missing: ${path}`);",
             "const current=await db.getRaw(entry._id,{conflicts:true});",
@@ -515,7 +515,7 @@ async function storeHiddenFileAsConflict(
             "(async()=>{",
             `const path=${JSON.stringify(path)};`,
             `const baseRev=${JSON.stringify(baseRev)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const addOn=core.getAddOn('HiddenFileSync');",
             "const fileInfo=await addOn.loadFileWithInfo(path);",
             "if(fileInfo.deleted) throw new Error(`Hidden file was unexpectedly deleted: ${path}`);",
@@ -562,7 +562,7 @@ async function createHiddenJsonConflict(
     const conflicts = await evalObsidianJson<number>(
         context.cliBinary,
         `(async()=>{
-        const entry=await app.plugins.plugins['obsidian-livesync'].core.localDatabase.getDBEntryMeta(${JSON.stringify(`i:${path}`)},{conflicts:true});
+        const entry=await app.plugins.plugins['livesync-efficient'].core.localDatabase.getDBEntryMeta(${JSON.stringify(`i:${path}`)},{conflicts:true});
         return JSON.stringify(entry?entry._conflicts?.length||0:0);
     })()`,
         session.cliEnv
@@ -672,7 +672,7 @@ async function runCreateRoundTrip(
         context.cliBinary,
         [
             "(async()=>{",
-            "const rebuilder=app.plugins.plugins['obsidian-livesync'].core.rebuilder;",
+            "const rebuilder=app.plugins.plugins['livesync-efficient'].core.rebuilder;",
             "const inform=rebuilder.informOptionalFeatures;",
             "rebuilder.informOptionalFeatures=async()=>{};",
             "try{await rebuilder.$rebuildRemote();}finally{rebuilder.informOptionalFeatures=inform;}",
@@ -825,7 +825,7 @@ async function runJsonManualConflictReplacement(context: RunnerContext, vault: T
         [
             "(async()=>{",
             `const path=${JSON.stringify(replacementMergeJsonPath)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const addOn=core.getAddOn('HiddenFileSync');",
             "const db=core.localDatabase;",
             "const entry=await db.getDBEntry(`i:${path}`);",
@@ -881,7 +881,7 @@ async function runJsonManualConflictReplacement(context: RunnerContext, vault: T
         [
             "(()=>{",
             `const path=${JSON.stringify(replacementMergeJsonPath)};`,
-            "const addOn=app.plugins.plugins['obsidian-livesync'].core.getAddOn('HiddenFileSync');",
+            "const addOn=app.plugins.plugins['livesync-efficient'].core.getAddOn('HiddenFileSync');",
             "addOn.queueConflictCheck(path);",
             "return JSON.stringify({queued:true});",
             "})()",
@@ -1126,7 +1126,7 @@ async function runJsonManualExternalResolution(context: RunnerContext, vault: Te
         [
             "(async()=>{",
             `const path=${JSON.stringify(externalResolutionUnrelatedPath)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const meta=await core.localDatabase.getDBEntryMeta(`i:${path}`,{conflicts:true},true);",
             "if(!meta)throw new Error(`Unrelated hidden metadata is missing: ${path}`);",
             "if((meta._conflicts||[]).length!==0)throw new Error(`Unrelated hidden metadata unexpectedly has conflicts: ${path}`);",
@@ -1178,7 +1178,7 @@ async function runJsonManualExternalResolution(context: RunnerContext, vault: Te
         [
             "(async()=>{",
             `const path=${JSON.stringify(externalResolutionTargetPath)};`,
-            "const db=app.plugins.plugins['obsidian-livesync'].core.localDatabase;",
+            "const db=app.plugins.plugins['livesync-efficient'].core.localDatabase;",
             "const entry=await db.getDBEntry(`i:${path}`);",
             "if(!entry)throw new Error(`Hidden conflict entry is missing: ${path}`);",
             "const current=await db.getRaw(entry._id,{conflicts:true});",
@@ -1189,7 +1189,7 @@ async function runJsonManualExternalResolution(context: RunnerContext, vault: Te
             "const meta=await db.getDBEntryMeta(`i:${path}`,{conflicts:true},true);",
             "if(!meta)throw new Error(`Resolved hidden metadata is missing: ${path}`);",
             "if((meta._conflicts||[]).length!==0)throw new Error(`External hidden resolution still has conflicts: ${path}`);",
-            "await app.plugins.plugins['obsidian-livesync'].core.services.replication.processOptionalSynchroniseResult(meta);",
+            "await app.plugins.plugins['livesync-efficient'].core.services.replication.processOptionalSynchroniseResult(meta);",
             "return JSON.stringify({winnerRev:meta._rev,removedRev});",
             "})()",
         ].join(""),
@@ -1328,7 +1328,7 @@ async function setHiddenFileNoticeFixtures(port: number, itemIds: string[], incl
         await page.evaluate(
             ({ nextItemIds, nextIncludeRestart }) => {
                 const obsidianApp = (globalThis as typeof globalThis & { app: any }).app;
-                const plugin = obsidianApp.plugins.plugins["obsidian-livesync"];
+                const plugin = obsidianApp.plugins.plugins["livesync-efficient"];
                 const core = plugin.core;
                 const addOn = core.getAddOn("HiddenFileSync");
                 for (const id of ["alpha", "beta", "gamma"]) {
@@ -1363,7 +1363,7 @@ async function clearHiddenFileNoticeFixtures(port: number): Promise<void> {
     await withObsidianPage(port, async (page) => {
         await page.evaluate(() => {
             const obsidianApp = (globalThis as typeof globalThis & { app: any }).app;
-            const plugin = obsidianApp.plugins.plugins["obsidian-livesync"];
+            const plugin = obsidianApp.plugins.plugins["livesync-efficient"];
             plugin.core.services.context.noticeGroups.hide("hidden-file-changes");
             for (const id of ["alpha", "beta", "gamma"]) {
                 const pluginId = `livesync-e2e-${id}`;
@@ -1404,7 +1404,7 @@ async function runInitialisationNoticeGrouping(context: RunnerContext, vault: Te
         await withObsidianPage(port, async (page) => {
             await page.evaluate((stateKey) => {
                 const obsidianApp = (globalThis as typeof globalThis & { app: any }).app;
-                const plugin = obsidianApp.plugins.plugins["obsidian-livesync"];
+                const plugin = obsidianApp.plugins.plugins["livesync-efficient"];
                 const core = plugin.core;
                 const addOn = core.getAddOn("HiddenFileSync");
                 const setting = core.services.setting;
@@ -1673,7 +1673,7 @@ async function enableHiddenSyncThroughSettings(
     await evalObsidianJson(
         context.cliBinary,
         `(()=>{
-        const core=app.plugins.plugins['obsidian-livesync'].core;
+        const core=app.plugins.plugins['livesync-efficient'].core;
         if(core.settings.syncInternalFiles)throw new Error('Hidden File Sync must start disabled');
         const setting=core.services.setting;
         const original=setting.enableOptionalFeature;
@@ -1707,7 +1707,7 @@ async function enableHiddenSyncThroughSettings(
                 while(!state.done&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));
                 if(!state.done)throw new Error('Hidden File Sync enablement did not complete');
                 if(state.error)throw new Error(state.error);
-                const core=app.plugins.plugins['obsidian-livesync'].core;
+                const core=app.plugins.plugins['livesync-efficient'].core;
                 return JSON.stringify({mode:state.mode,enabled:core.settings.syncInternalFiles});
             })()
         `,
@@ -1716,7 +1716,7 @@ async function enableHiddenSyncThroughSettings(
         );
         assertEqual(result.mode, mode.toUpperCase(), "The settings action invoked a different enablement mode.");
         assertEqual(result.enabled, true, "Hidden File Sync was not enabled by its settings action.");
-        const saved = JSON.parse(await readVaultFile(vault.path, ".obsidian/plugins/obsidian-livesync/data.json"));
+        const saved = JSON.parse(await readVaultFile(vault.path, ".obsidian/plugins/livesync-efficient/data.json"));
         assertEqual(saved.syncInternalFiles, true, "Hidden File Sync enablement was not persisted.");
     } finally {
         await evalObsidianJson(
@@ -1737,7 +1737,7 @@ async function startPersistedSession(context: RunnerContext, vault: TemporaryVau
     await waitForLiveSyncCoreReady(context.cliBinary, session.cliEnv);
     const enabled = await evalObsidianJson<boolean>(
         context.cliBinary,
-        "JSON.stringify(app.plugins.plugins['obsidian-livesync'].core.settings.syncInternalFiles)",
+        "JSON.stringify(app.plugins.plugins['livesync-efficient'].core.settings.syncInternalFiles)",
         session.cliEnv
     );
     assertEqual(enabled, true, "Hidden File Sync enablement did not survive restart.");
@@ -1812,7 +1812,7 @@ async function runHiddenEnablement(context: RunnerContext, mode: HiddenEnablemen
     const receivedRevisions = await evalObsidianJson<string[]>(
         context.cliBinary,
         `(async()=>{
-        const db=app.plugins.plugins['obsidian-livesync'].core.localDatabase;
+        const db=app.plugins.plugins['livesync-efficient'].core.localDatabase;
         const revisions=[];
         for(const id of ${JSON.stringify(uploaded.map((entry) => entry.id))}) {
             const doc=await db.getRaw(id);
@@ -1944,7 +1944,7 @@ async function main(): Promise<void> {
                 cli.binary,
                 [
                     "(async()=>{",
-                    "const core=app.plugins.plugins['obsidian-livesync'].core;",
+                    "const core=app.plugins.plugins['livesync-efficient'].core;",
                     "const addOn=core.getAddOn('HiddenFileSync');",
                     `const paths=${JSON.stringify(context.diagnosticPaths)};`,
                     "const files=await addOn.scanInternalFileNames();",

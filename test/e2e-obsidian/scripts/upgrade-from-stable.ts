@@ -35,7 +35,7 @@ import {
     type ObjectStorageConfig,
 } from "../runner/objectStorage.ts";
 import { ensurePinnedReleaseArtifact, UPGRADE_SOURCE_RELEASE } from "../runner/releaseArtifact.ts";
-import { startObsidianLiveSyncSession, type ObsidianLiveSyncSession } from "../runner/session.ts";
+import { FORK_PLUGIN_ID, startObsidianLiveSyncSession, type ObsidianLiveSyncSession } from "../runner/session.ts";
 import {
     assertCouchDbCheckpointContinuity,
     assertCouchDbDocumentsUnchanged,
@@ -61,6 +61,7 @@ import {
     createUpgradeScenarioPaths,
     createVerifierReturnDelta,
     dismissConfigDoctorIfShown,
+    migratePluginFolder,
     prepareStableRemote,
     readJournalCheckpoint,
     readLocalCouchDbCheckpoints,
@@ -213,7 +214,7 @@ async function validateTargetArtifact(root: string): Promise<string> {
         id?: unknown;
         version?: unknown;
     };
-    assertEqual(manifest.id, UPGRADE_SOURCE_RELEASE.pluginId, "The target artefact has an unexpected plug-in id.");
+    assertEqual(manifest.id, FORK_PLUGIN_ID, "The target artefact has an unexpected plug-in id.");
     assert(typeof manifest.version === "string" && manifest.version.length > 0, "The target manifest has no version.");
     assert(
         manifest.version !== STABLE_RELEASE_VERSION,
@@ -229,10 +230,13 @@ async function startSession(
     artifactRoot: string,
     options: StartSessionOptions = {}
 ): Promise<ObsidianLiveSyncSession> {
+    const pluginId = artifactRoot === context.sourceArtifactRoot ? UPGRADE_SOURCE_RELEASE.pluginId : FORK_PLUGIN_ID;
+    if (pluginId === FORK_PLUGIN_ID) await migratePluginFolder(vault, UPGRADE_SOURCE_RELEASE.pluginId);
     const session = await startObsidianLiveSyncSession({
         binary: context.binary,
         cliBinary: context.cliBinary,
         vault,
+        pluginId,
         artifactRoot,
         pluginData: options.pluginData,
         localStorageEntries: options.localStorageEntries,
@@ -251,13 +255,20 @@ async function startSession(
     }
 }
 
-async function readStoredPluginData(vault: TemporaryVault): Promise<Record<string, unknown>> {
-    const path = resolve(vault.path, ".obsidian", "plugins", "obsidian-livesync", "data.json");
+async function readStoredPluginData(
+    vault: TemporaryVault,
+    pluginId = FORK_PLUGIN_ID
+): Promise<Record<string, unknown>> {
+    const path = resolve(vault.path, ".obsidian", "plugins", pluginId, "data.json");
     return JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
 }
 
-async function writeStoredPluginData(vault: TemporaryVault, data: Record<string, unknown>): Promise<void> {
-    const path = resolve(vault.path, ".obsidian", "plugins", "obsidian-livesync", "data.json");
+async function writeStoredPluginData(
+    vault: TemporaryVault,
+    data: Record<string, unknown>,
+    pluginId = FORK_PLUGIN_ID
+): Promise<void> {
+    const path = resolve(vault.path, ".obsidian", "plugins", pluginId, "data.json");
     await writeFile(path, `${JSON.stringify(data, null, 2)}\n`);
 }
 
@@ -274,7 +285,7 @@ async function runUnconfiguredSettingsUpgrade(context: RunnerContext, port: numb
         assertStableReleaseDefaults(stableState, false);
         await stopSession(context, session);
 
-        const stableData = await readStoredPluginData(vault);
+        const stableData = await readStoredPluginData(vault, UPGRADE_SOURCE_RELEASE.pluginId);
         if (stableData.isConfigured !== undefined) {
             assertEqual(
                 stableData.isConfigured,
@@ -287,7 +298,7 @@ async function runUnconfiguredSettingsUpgrade(context: RunnerContext, port: numb
         // unrelated settings-save event. Restore the pre-flag document
         // explicitly so the target proves the direct legacy migration in
         // either case rather than depending on that timing.
-        await writeStoredPluginData(vault, { liveSync: false });
+        await writeStoredPluginData(vault, { liveSync: false }, UPGRADE_SOURCE_RELEASE.pluginId);
 
         session = await startSession(context, vault, port, context.targetArtifactRoot, {
             waitForCoreReady: false,

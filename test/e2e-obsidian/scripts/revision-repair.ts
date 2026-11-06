@@ -73,7 +73,7 @@ async function createHealthyLogicalDeletion(cliBinary: string, env: NodeJS.Proce
             "(async()=>{",
             `const path=${JSON.stringify(healthyDeletedPath)};`,
             `const timeoutMs=${JSON.stringify(uiTimeoutMs)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const file=app.vault.getAbstractFileByPath(path);",
             "if(!file) throw new Error(`Logical-deletion fixture is missing from the Vault: ${path}`);",
             "await app.vault.delete(file);",
@@ -107,7 +107,7 @@ async function createBrokenConflict(
             `const path=${JSON.stringify(path)};`,
             `const baseRevision=${JSON.stringify(baseRevision)};`,
             `const contents=${JSON.stringify(branchContents)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const id=await core.services.path.path2id(path);",
             "for(const [index,content] of contents.entries()){",
             "  const blob=new Blob([content],{type:'text/plain'});",
@@ -154,7 +154,7 @@ async function readRevisionTree(cliBinary: string, env: NodeJS.ProcessEnv): Prom
         [
             "(async()=>{",
             `const path=${JSON.stringify(path)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const id=await core.services.path.path2id(path);",
             "const tree=await core.localDatabase.localDatabase.get(id,{conflicts:true});",
             "return JSON.stringify({",
@@ -173,7 +173,7 @@ async function readVaultWinnerState(cliBinary: string, env: NodeJS.ProcessEnv): 
         [
             "(async()=>{",
             `const path=${JSON.stringify(path)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const file=app.vault.getAbstractFileByPath(path);",
             "if(!file) throw new Error(`Vault file is missing: ${path}`);",
             "const entry=await core.localDatabase.getDBEntry(path,undefined,false,true,true);",
@@ -201,7 +201,7 @@ async function readFileReflectionProvenance(
         [
             "(async()=>{",
             `const path=${JSON.stringify(targetPath)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const store=core.services.keyValueDB.openSimpleStore('file-reflection-provenance-v1');",
             "return JSON.stringify((await store.get(path))??null);",
             "})()",
@@ -235,11 +235,7 @@ async function openRevisionActionMenu(page: Page, settings: Locator, revision: s
         width: window.innerWidth,
         height: window.innerHeight,
     }));
-    if (
-        box === null ||
-        box.y < 0 ||
-        box.y + box.height > viewport.height - 4
-    ) {
+    if (box === null || box.y < 0 || box.y + box.height > viewport.height - 4) {
         throw new Error(
             `Revision action menu is outside the viewport: ${JSON.stringify({
                 box,
@@ -263,7 +259,7 @@ async function requestConflictCheck(cliBinary: string, env: NodeJS.ProcessEnv): 
         [
             "(async()=>{",
             `const path=${JSON.stringify(path)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "core.localDatabase.clearCaches();",
             "await core.services.conflict.queueCheckFor(path);",
             "await core.services.conflict.ensureAllProcessed();",
@@ -367,9 +363,7 @@ async function main(): Promise<void> {
             }
             const winnerRevision = revisionCard(settings, fixture.winnerRevision);
             const brokenRevision = revisionCard(settings, fixture.conflictRevision);
-            await brokenRevision
-                .getByText(/🧩 Missing chunks: 1/u)
-                .waitFor({ state: "visible", timeout: uiTimeoutMs });
+            await brokenRevision.getByText(/🧩 Missing chunks: 1/u).waitFor({ state: "visible", timeout: uiTimeoutMs });
             await brokenRevision.getByText(fixture.missingChunkId, { exact: false }).waitFor({
                 state: "visible",
                 timeout: uiTimeoutMs,
@@ -436,9 +430,7 @@ async function main(): Promise<void> {
                 scrollWidth: element.scrollWidth,
             }));
             if (dimensions.scrollWidth > dimensions.clientWidth + 1) {
-                throw new Error(
-                    `Revision repair card overflowed at mobile width: ${JSON.stringify(dimensions)}`
-                );
+                throw new Error(`Revision repair card overflowed at mobile width: ${JSON.stringify(dimensions)}`);
             }
         });
         const mobileWidthScreenshot = await captureObsidianElement(

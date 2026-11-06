@@ -77,7 +77,6 @@ describe("Advanced setting specifications", () => {
         const specs = [
             ...createAdvancedSettingSpecGroups({ isCouchDB: () => true }),
             ...createGeneralSettingSpecGroups({
-                showEditorStatusDetails: () => true,
                 showVerboseLog: () => true,
             }),
         ].flatMap(({ items }) => items);
@@ -97,16 +96,12 @@ describe("Advanced setting specifications", () => {
 describe("General setting specifications", () => {
     it("shares every General, Logging, and File identity control between the imperative and declarative renderers", () => {
         const groups = createGeneralSettingSpecGroups({
-            showEditorStatusDetails: () => true,
             showVerboseLog: () => true,
         });
 
         expect(groups.map(({ heading }) => heading)).toEqual(["Appearance", "Logging", "File identity"]);
         expect(groups.flatMap(({ items }) => items.map(({ key }) => key))).toEqual([
             "displayLanguage",
-            "showStatusOnEditor",
-            "showOnlyIconsOnEditor",
-            "showStatusOnStatusbar",
             "hideFileWarningNotice",
             "syncGuardEnabled",
             "syncGuardMinimumFiles",
@@ -119,7 +114,6 @@ describe("General setting specifications", () => {
 
     it("exposes path identity for every remote type as a reconstruction-required dropdown", () => {
         const spec = createGeneralSettingSpecGroups({
-            showEditorStatusDetails: () => false,
             showVerboseLog: () => false,
         })
             .flatMap(({ items }) => items)
@@ -161,21 +155,15 @@ describe("General setting specifications", () => {
         expect(group.items.map(({ key }) => key)).toEqual(["useAdvancedMode", "usePowerUserMode", "useEdgeCaseMode"]);
     });
 
-    it("retains the two conditional visibility rules", () => {
-        let editorDetails = false;
+    it("keeps the verbose log behind the given visibility rule", () => {
         let verboseLog = false;
         const specs = createGeneralSettingSpecGroups({
-            showEditorStatusDetails: () => editorDetails,
             showVerboseLog: () => verboseLog,
         }).flatMap(({ items }) => items);
-        const editorIcons = specs.find(({ key }) => key === "showOnlyIconsOnEditor");
         const verbose = specs.find(({ key }) => key === "showVerboseLog");
 
-        expect(editorIcons?.visible?.()).toBe(false);
         expect(verbose?.visible?.()).toBe(false);
-        editorDetails = true;
         verboseLog = true;
-        expect(editorIcons?.visible?.()).toBe(true);
         expect(verbose?.visible?.()).toBe(true);
     });
 });

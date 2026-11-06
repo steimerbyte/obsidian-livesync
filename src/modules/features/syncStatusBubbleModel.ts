@@ -1,5 +1,22 @@
 export type SyncBubbleTone = "starting" | "ready" | "syncing" | "config" | "error" | "paused" | "offline";
 
+export type SyncBubbleCategoryTone = "ok" | "warn" | "error";
+
+export type SyncBubbleCategoryKey = "initialisation" | "replication" | "sync" | "config" | "storage" | "warnings";
+
+export type SyncBubbleCategory = {
+    key: SyncBubbleCategoryKey;
+    label: string;
+    tone: SyncBubbleCategoryTone;
+};
+
+/** Counts still waiting in the storage, database and chunk queues. */
+export type SyncBubbleStorageQueues = {
+    storage?: number;
+    database?: number;
+    chunk?: number;
+};
+
 export type SyncBubbleSnapshot = {
     ready: boolean;
     syncStatus: string;
@@ -10,6 +27,8 @@ export type SyncBubbleSnapshot = {
     queueText?: string;
     configActive?: boolean;
     statusText?: string;
+    warningText?: string;
+    storageQueues?: SyncBubbleStorageQueues;
 };
 
 export type SyncBubbleState = {
@@ -140,4 +159,45 @@ export function deriveSyncBubbleState(snapshot: SyncBubbleSnapshot): SyncBubbleS
         icon: "check",
         busy: false,
     };
+}
+
+const IDLE_STATUSES: Record<string, true> = {
+    COMPLETED: true,
+    CLOSED: true,
+};
+
+/**
+ * Health rows for the expanded card. Each subsystem reports its own state, so a
+ * backlog or a warning stays visible while the rest keeps saying it is fine.
+ */
+export function deriveSyncBubbleCategories(snapshot: SyncBubbleSnapshot): SyncBubbleCategory[] {
+    // The Sync row mirrors the orb so the card never says "Sync: ok" next to "Offline".
+    const overallTone = deriveSyncBubbleState(snapshot).tone;
+
+    return [
+        { key: "initialisation", label: "Initialisation", tone: snapshot.ready ? "ok" : "warn" },
+        {
+            key: "replication",
+            label: "Replication",
+            tone:
+                snapshot.syncStatus === "ERRORED"
+                    ? "error"
+                    : // Anything else means replication is running, paused, or not yet connected.
+                      IDLE_STATUSES[snapshot.syncStatus]
+                      ? "ok"
+                      : "warn",
+        },
+        {
+            key: "sync",
+            label: "Sync",
+            tone: overallTone === "error" ? "error" : overallTone === "ready" ? "ok" : "warn",
+        },
+        { key: "config", label: "Config sync", tone: snapshot.configActive ? "warn" : "ok" },
+        {
+            key: "storage",
+            label: "Storage",
+            tone: Object.values(snapshot.storageQueues ?? {}).some((count) => (count ?? 0) > 0) ? "warn" : "ok",
+        },
+        { key: "warnings", label: "Warnings", tone: snapshot.warningText?.trim() ? "error" : "ok" },
+    ];
 }

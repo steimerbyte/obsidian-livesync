@@ -45,7 +45,7 @@ async function main(): Promise<void> {
         return await evalObsidianJson<T>(
             cliBinary,
             `(async()=>{
-                const core=app.plugins.plugins['obsidian-livesync']?.core;
+                const core=app.plugins.plugins['livesync-efficient']?.core;
                 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
                 const require=(condition,message)=>{if(!condition)throw new Error(message);};
                 const waitFor=async(predicate,message,timeoutMs=15000)=>{

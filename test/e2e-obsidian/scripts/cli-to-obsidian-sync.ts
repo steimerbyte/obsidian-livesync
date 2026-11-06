@@ -544,7 +544,7 @@ async function main(): Promise<void> {
                 obsidianCli.binary,
                 [
                     "(async()=>{",
-                    "const core=app.plugins.plugins['obsidian-livesync'].core;",
+                    "const core=app.plugins.plugins['livesync-efficient'].core;",
                     "if(core.settings.useRequestAPI) throw new Error('This case requires Streaming Fast Fetch.');",
                     "await core.services.setting.applyPartial({suspendParseReplicationResult:true,suspendFileWatching:true});",
                     `const legacyId=${JSON.stringify(cliFileInfo.legacyId)};`,
@@ -577,7 +577,7 @@ async function main(): Promise<void> {
                 obsidianCli.binary,
                 [
                     "(async()=>{",
-                    "const core=app.plugins.plugins['obsidian-livesync'].core;",
+                    "const core=app.plugins.plugins['livesync-efficient'].core;",
                     `const entry=await core.localDatabase.getDBEntry(${JSON.stringify(receivedNotePath)},undefined,false,true);`,
                     "return JSON.stringify(entry.ctime);",
                     "})()",

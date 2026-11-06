@@ -89,7 +89,7 @@ async function main(): Promise<void> {
             cliBinary,
             [
                 "(async()=>{",
-                "const core=app.plugins.plugins['obsidian-livesync'].core;",
+                "const core=app.plugins.plugins['livesync-efficient'].core;",
                 "const require=(condition,message)=>{if(!condition)throw new Error(message);};",
                 "const textPath='synthetic-split-pair.md';",
                 "const controlPath='complete-pair.md';",

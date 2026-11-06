@@ -4,20 +4,15 @@ import { requestUserInitiatedReplication } from "@/serviceFeatures/manualReplica
 import type { LiveSyncCore } from "@/main.ts";
 import { ModuleLog } from "./ModuleLog.ts";
 import {
+    deriveSyncBubbleCategories,
     deriveSyncBubbleState,
+    type SyncBubbleCategoryTone,
+    type SyncBubbleSnapshot,
     type SyncBubbleState,
     type SyncBubbleTone,
 } from "./syncStatusBubbleModel.ts";
 
-const TONE_CLASSES: SyncBubbleTone[] = [
-    "starting",
-    "ready",
-    "syncing",
-    "config",
-    "error",
-    "paused",
-    "offline",
-];
+const TONE_CLASSES: SyncBubbleTone[] = ["starting", "ready", "syncing", "config", "error", "paused", "offline"];
 
 const QUEUE_PART_KEYS: Record<string, true> = {
     "file-processing": true,
@@ -31,6 +26,14 @@ const QUEUE_PART_KEYS: Record<string, true> = {
     "queue-plugin-scan": true,
     "queue-hidden-files": true,
     "queue-conflicts": true,
+};
+
+const LOG_LINE_LIMIT = 8;
+
+const CATEGORY_TONE_LABELS: Record<SyncBubbleCategoryTone, string> = {
+    ok: "OK",
+    warn: "Warning",
+    error: "Error",
 };
 
 type BubbleMessage = {
@@ -59,6 +62,8 @@ export class SyncStatusBubble {
     private detailEl!: HTMLElement;
     private barEl!: HTMLElement;
     private barFill!: HTMLElement;
+    private categoriesEl!: HTMLElement;
+    private liveStatusEl!: HTMLElement;
     private messageEl!: HTMLElement;
     private messageTitleEl!: HTMLElement;
     private messageBodyEl!: HTMLElement;
@@ -67,6 +72,8 @@ export class SyncStatusBubble {
     private isOpen = false;
     private lastSignature = "";
     private lastIcon = "";
+    private lastCategories = "";
+    private lastLiveStatus = "";
     private timer?: number;
     private isMounted = false;
     private noticeAPI?: NoticeCapableAPI;
@@ -125,6 +132,10 @@ export class SyncStatusBubble {
         this.barFill = this.barEl.createSpan({ cls: "lsb-bar-fill" });
         this.barEl.hidden = true;
 
+        this.categoriesEl = this.card.createDiv({ cls: "lsb-categories" });
+        this.liveStatusEl = this.card.createEl("pre", { cls: "lsb-live-status", attr: { tabindex: "0" } });
+        this.liveStatusEl.hidden = true;
+
         this.messageEl = this.card.createDiv({ cls: "lsb-message" });
         this.messageTitleEl = this.messageEl.createDiv({ cls: "lsb-message-title" });
         this.messageBodyEl = this.messageEl.createDiv({ cls: "lsb-message-body" });
@@ -176,28 +187,32 @@ export class SyncStatusBubble {
     showMessage(title: string, body: string, duration = 8000): void {
         this.message = { title, body, until: duration > 0 ? Date.now() + duration : 0 };
         this.root.classList.toggle("has-message", !this.isOpen);
-        this.render(this.currentState());
+        this.refresh();
     }
 
-    private currentState(): SyncBubbleState {
-        let log: ModuleLog | undefined;
+    private logModule(): ModuleLog | undefined {
         try {
-            log = this.core.getModule(ModuleLog);
+            return this.core.getModule(ModuleLog);
         } catch {
             // The bubble mounts before _startUp, so the log module may not exist yet.
+            return undefined;
         }
+    }
+
+    private buildSnapshot(log: ModuleLog | undefined): SyncBubbleSnapshot {
         const labels = log?.statusBarLabels?.value;
         const parts = labels?.parts ?? [];
         const stats = this.core.services.replicator?.replicationStatics?.value;
+        const partValue = (key: string) => parts.find((part) => part.key === key)?.value ?? 0;
         const queueText = parts
             .filter((part) => QUEUE_PART_KEYS[part.key] && (part.value ?? 0) > 0)
             .map((part) => `${part.text.trim()} ${part.value}`)
             .join(" ");
-        const pluginScanActive = (parts.find((part) => part.key === "queue-plugin-scan")?.value ?? 0) > 0;
         const configActive =
-            pluginScanActive || /scanning customi[sz]ations|customi[sz]ation sync/i.test(labels?.status ?? "");
+            partValue("queue-plugin-scan") > 0 ||
+            /scanning customi[sz]ations|customi[sz]ation sync/i.test(labels?.status ?? "");
 
-        return deriveSyncBubbleState({
+        return {
             ready: this.core.services.appLifecycle.isReady(),
             syncStatus: stats?.syncStatus ?? "",
             maxPullSeq: stats?.maxPullSeq ?? 0,
@@ -207,7 +222,37 @@ export class SyncStatusBubble {
             queueText,
             configActive,
             statusText: labels?.status ?? "",
-        });
+            warningText: log?.statusMessages?.value ?? "",
+            storageQueues: {
+                storage: partValue("queue-storage"),
+                database: partValue("queue-database"),
+                chunk: partValue("queue-chunk-initial") + partValue("queue-chunk-retrying"),
+            },
+        };
+    }
+
+    /** The text that used to sit in the top-right overlay, deduplicated for the card. */
+    private liveStatusText(log: ModuleLog | undefined): string {
+        const labels = log?.statusBarLabels?.value;
+        const lines: string[] = [];
+        const seen = new Set<string>();
+        const push = (text: string | undefined) => {
+            if (!text) return;
+            for (const raw of text.split("\n")) {
+                const line = raw.trim();
+                if (line === "" || seen.has(line)) continue;
+                seen.add(line);
+                lines.push(line);
+            }
+        };
+
+        push((labels?.parts ?? []).map((part) => `${part.text}${part.value ?? ""}${part.suffix ?? ""}`).join(""));
+        push(labels?.message);
+        push(labels?.status);
+        push(log?.statusMessages?.value);
+        // slice() copies, so reverse() cannot reorder the log's own array.
+        push((log?.logLines ?? []).slice(-LOG_LINE_LIMIT).reverse().join("\n"));
+        return lines.join("\n");
     }
 
     /** Keep the orb at the top-right of the active note, clear of the sidebar toggle and sidebars. */
@@ -217,7 +262,7 @@ export class SyncStatusBubble {
         if (!rect || rect.width <= 0) return;
         const margin = Platform.isMobile ? 12 : 52;
         const top = Platform.isMobile ? Math.max(60, rect.top + 12) : Math.max(12, rect.top + 12);
-        this.root.style.left = `${Math.max(8, Math.round(rect.right - 44 - margin))}px`;
+        this.root.style.left = `${Math.max(8, Math.round(rect.right - this.root.offsetWidth - margin))}px`;
         this.root.style.top = `${Math.round(top)}px`;
         this.root.style.right = "auto";
     }
@@ -228,7 +273,10 @@ export class SyncStatusBubble {
             this.message = undefined;
             this.root.classList.remove("has-message");
         }
-        this.render(this.currentState());
+        const log = this.logModule();
+        const snapshot = this.buildSnapshot(log);
+        this.render(deriveSyncBubbleState(snapshot));
+        this.renderLive(snapshot, log);
     }
 
     private render(state: SyncBubbleState): void {
@@ -254,10 +302,7 @@ export class SyncStatusBubble {
         this.orb.setAttr("aria-label", `LiveSync: ${state.headline}. ${state.detail}`);
         this.barEl.hidden = state.progress === undefined || state.tone !== "syncing";
         this.barFill.style.width = `${Math.round((state.progress ?? 0) * 100)}%`;
-        this.progressRing.classList.toggle(
-            "is-hidden",
-            state.tone !== "syncing" || state.progress === undefined
-        );
+        this.progressRing.classList.toggle("is-hidden", state.tone !== "syncing" || state.progress === undefined);
 
         const hasMessage = this.message !== undefined;
         this.messageEl.hidden = !hasMessage;
@@ -266,6 +311,29 @@ export class SyncStatusBubble {
             this.messageBodyEl.textContent = this.message.body;
         }
         this.root.classList.toggle("has-message", hasMessage && !this.isOpen);
+    }
+
+    /** Categories and the live status text change on every poll, so they skip the orb's signature guard. */
+    private renderLive(snapshot: SyncBubbleSnapshot, log: ModuleLog | undefined): void {
+        const categories = deriveSyncBubbleCategories(snapshot);
+        const signature = categories.map((category) => `${category.key}:${category.tone}`).join("|");
+        if (signature !== this.lastCategories) {
+            this.lastCategories = signature;
+            this.categoriesEl.empty();
+            for (const category of categories) {
+                const row = this.categoriesEl.createDiv({ cls: `lsb-category is-${category.tone}` });
+                row.setAttr("aria-label", `${category.label}: ${CATEGORY_TONE_LABELS[category.tone]}`);
+                row.createSpan({ cls: "lsb-category-dot", attr: { "aria-hidden": "true" } });
+                row.createSpan({ cls: "lsb-category-label", text: category.label });
+            }
+        }
+
+        const text = this.liveStatusText(log);
+        if (text !== this.lastLiveStatus) {
+            this.lastLiveStatus = text;
+            this.liveStatusEl.textContent = text;
+            this.liveStatusEl.hidden = text === "";
+        }
     }
 
     private toggle(): void {

@@ -45,7 +45,7 @@ import { createTemporaryVault } from "../runner/vault.ts";
 import type { Locator, Page } from "playwright";
 
 const uiTimeoutMs = Number(process.env.E2E_OBSIDIAN_JOINED_DEVICES_TIMEOUT_MS ?? 10000);
-const commandId = "obsidian-livesync:joined-devices";
+const commandId = "livesync-efficient:joined-devices";
 const targetId = "joined-devices-target";
 const retainedId = "joined-devices-retained";
 const initialPlatform = "E2E Android tablet";
@@ -175,7 +175,7 @@ async function readSelfDeviceInfo(cliBinary: string, env: NodeJS.ProcessEnv): Pr
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             `const nodeInfo=await core.services.database.localDatabase.localDatabase.get(${JSON.stringify(NODEINFO_DOCID)});`,
             "return JSON.stringify({",
             "id:nodeInfo.nodeid,",

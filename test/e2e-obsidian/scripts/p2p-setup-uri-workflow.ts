@@ -201,7 +201,7 @@ async function readReflectionDiagnostics(
         [
             "(async()=>{",
             `const path=${JSON.stringify(path)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const settings=core.services.setting.currentSettings();",
             "const entry=await core.localDatabase.getDBEntry(path,undefined,false,true).catch(()=>false);",
             "const chunks=entry&&Array.isArray(entry.children)?await Promise.all(entry.children.map(async(id)=>{",
@@ -240,7 +240,7 @@ async function executeCommand(port: number, commandId: string): Promise<void> {
 }
 
 async function openP2PStatus(port: number, filename: string): Promise<string> {
-    await executeCommand(port, "obsidian-livesync:open-p2p-server-status");
+    await executeCommand(port, "livesync-efficient:open-p2p-server-status");
     await withObsidianPage(port, async (page) => {
         const heading = page.getByRole("heading", { name: "Signalling Status" }).last();
         await heading.waitFor({ state: "visible", timeout: uiTimeoutMs });
@@ -273,7 +273,7 @@ async function openP2PStatus(port: number, filename: string): Promise<string> {
 }
 
 async function reconnectP2PStatus(port: number): Promise<void> {
-    await executeCommand(port, "obsidian-livesync:open-p2p-server-status");
+    await executeCommand(port, "livesync-efficient:open-p2p-server-status");
     await withObsidianPage(port, async (page) => {
         const heading = page.getByRole("heading", { name: "Signalling Status" }).last();
         await heading.waitFor({ state: "visible", timeout: uiTimeoutMs });
@@ -410,7 +410,7 @@ async function verifyInterruptedFetchRestart(
     await withObsidianPage(portB, async (page) => {
         const before = await page.evaluate(async (path) => {
             const app = (globalThis as any).app;
-            const core = app.plugins.plugins["obsidian-livesync"].core;
+            const core = app.plugins.plugins["livesync-efficient"].core;
             return {
                 inVault: await app.vault.adapter.exists(path),
                 inDatabase: !!(await core.localDatabase.getDBEntry(path, undefined, false, true)),
@@ -419,7 +419,7 @@ async function verifyInterruptedFetchRestart(
         assertEqual(before.inVault, false, "The recovery source note already existed in the receiving Vault.");
         assertEqual(before.inDatabase, false, "The recovery source note arrived before the scheduled P2P Fetch.");
         await page.evaluate(async () => {
-            const core = (globalThis as any).app.plugins.plugins["obsidian-livesync"].core;
+            const core = (globalThis as any).app.plugins.plugins["livesync-efficient"].core;
             if (!(await core.rebuilder.scheduleFetch())) throw new Error("Could not schedule the P2P Fetch.");
         });
     });
@@ -427,7 +427,7 @@ async function verifyInterruptedFetchRestart(
     await withObsidianPage(portB, async (page) => {
         await modalByTitle(page, "Data retrieval scheduled").waitFor({ state: "visible", timeout: uiTimeoutMs });
         await page.evaluate(() => {
-            const core = (globalThis as any).app.plugins.plugins["obsidian-livesync"].core;
+            const core = (globalThis as any).app.plugins.plugins["livesync-efficient"].core;
             const fetch = core.rebuilder.$fetchLocalDBFast.bind(core.rebuilder);
             // Keep the actual P2P transport and interrupt before the subsequent Vault scan.
             core.rebuilder.$fetchLocalDBFast = async (...args: unknown[]) => {
@@ -443,7 +443,7 @@ async function verifyInterruptedFetchRestart(
     const pending = await withObsidianPage(portB, async (page) => {
         await page.waitForFunction(
             () => {
-                const core = (globalThis as any).app.plugins.plugins["obsidian-livesync"].core;
+                const core = (globalThis as any).app.plugins.plugins["livesync-efficient"].core;
                 const settings = core.services.setting.currentSettings();
                 return (
                     (globalThis as any).__p2pFetchInterrupted === true &&
@@ -457,7 +457,7 @@ async function verifyInterruptedFetchRestart(
         return await page.evaluate(
             async ({ remotePath, localPath, localContent }) => {
                 const app = (globalThis as any).app;
-                const core = app.plugins.plugins["obsidian-livesync"].core;
+                const core = app.plugins.plugins["livesync-efficient"].core;
                 const remoteEntry = await core.localDatabase.getDBEntry(remotePath, undefined, false, true);
                 const remoteInVault = await app.vault.adapter.exists(remotePath);
                 await app.vault.create(localPath, localContent);
@@ -486,7 +486,7 @@ async function verifyInterruptedFetchRestart(
 
     await withObsidianPage(portB, async (page) => {
         await page.evaluate(() =>
-            (globalThis as any).app.plugins.plugins["obsidian-livesync"].core.services.appLifecycle.performRestart()
+            (globalThis as any).app.plugins.plugins["livesync-efficient"].core.services.appLifecycle.performRestart()
         );
     });
     await withObsidianPage(portB, async (page) => {
@@ -499,7 +499,7 @@ async function verifyInterruptedFetchRestart(
         }
         const beforeConfirmation = await page.evaluate(async (remotePath) => {
             const app = (globalThis as any).app;
-            const core = app.plugins.plugins["obsidian-livesync"].core;
+            const core = app.plugins.plugins["livesync-efficient"].core;
             const settings = core.services.setting.currentSettings();
             return {
                 reloaded: (globalThis as any).__p2pFetchInterrupted === undefined,
@@ -535,7 +535,7 @@ async function verifyInterruptedFetchRestart(
         async (page) =>
             await page.evaluate(async () => {
                 const app = (globalThis as any).app;
-                const settings = app.plugins.plugins["obsidian-livesync"].core.services.setting.currentSettings();
+                const settings = app.plugins.plugins["livesync-efficient"].core.services.setting.currentSettings();
                 return {
                     flags: await Promise.all(
                         ["flag_fetch.md", "redflag3.md"].map((path) => app.vault.adapter.exists(path))
@@ -629,10 +629,8 @@ async function capturePeerActionsMenu(port: number): Promise<string> {
             throw new Error(`P2P peer actions menu did not fit the viewport: ${JSON.stringify(layout)}`);
         }
     });
-    const screenshot = await captureObsidianElement(
-        port,
-        "guide-p2p-setup-peer-actions-menu.png",
-        (page) => page.locator(".menu:visible").last()
+    const screenshot = await captureObsidianElement(port, "guide-p2p-setup-peer-actions-menu.png", (page) =>
+        page.locator(".menu:visible").last()
     );
     await withObsidianPage(port, async (page) => {
         await page.keyboard.press("Escape");

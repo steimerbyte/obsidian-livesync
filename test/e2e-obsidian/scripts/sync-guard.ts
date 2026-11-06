@@ -66,7 +66,7 @@ async function readObservation(cliBinary: string, env: NodeJS.ProcessEnv): Promi
         [
             "(()=>{",
             `const state=globalThis[${JSON.stringify(observerKey)}];`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const overlay=document.querySelector('.sls-sync-guard');",
             "return JSON.stringify({",
             "phase:core.services.replicator.replicationStatics.value.couchDB?.phase??'idle',",
@@ -127,7 +127,7 @@ async function installGates(
             "(()=>{",
             `const key=${JSON.stringify(observerKey)};`,
             "if(globalThis[key]) throw new Error('SyncGuard gates are already installed');",
-            "const services=app.plugins.plugins['obsidian-livesync'].core.services;",
+            "const services=app.plugins.plugins['livesync-efficient'].core.services;",
             "const replication=services.replication;",
             `const incomingIds=new Set(${JSON.stringify(incomingEntries.map((entry) => entry.id))});`,
             `const heldPath=${JSON.stringify(notes[0].path)};`,
@@ -208,7 +208,7 @@ async function startCatchUp(cliBinary: string, env: NodeJS.ProcessEnv): Promise<
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "await core.services.setting.setSyncGuardSetting('syncGuardEnabled',true);",
             `await core.services.setting.setSyncGuardSetting('syncGuardMinimumFiles',${minimumFiles});`,
             `const state=globalThis[${JSON.stringify(observerKey)}];`,

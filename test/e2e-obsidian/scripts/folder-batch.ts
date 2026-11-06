@@ -51,10 +51,15 @@ async function main(): Promise<void> {
             localStorageEntries: createE2eObsidianDeviceLocalState(vault.name),
         });
         await waitForLiveSyncCoreReady(cliBinary, session.cliEnv);
-        const result = await evalObsidianJson<{ descendants: number; renamed: number; deleted: number; missingRejected: boolean }>(
+        const result = await evalObsidianJson<{
+            descendants: number;
+            renamed: number;
+            deleted: number;
+            missingRejected: boolean;
+        }>(
             cliBinary,
             `(async()=>{
-                const core=app.plugins.plugins['obsidian-livesync'].core;
+                const core=app.plugins.plugins['livesync-efficient'].core;
                 const provenance=core.services.keyValueDB.openSimpleStore('file-reflection-provenance-v1');
                 const notes=${JSON.stringify(notes)};
                 const originalRoot=${JSON.stringify(originalRoot)};

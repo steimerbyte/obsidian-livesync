@@ -155,7 +155,7 @@ async function scrollDeclarativeLandingToTop(root: Locator, configured: boolean)
 
 async function setConfiguredStateForLandingInspection(page: Page, configured: boolean): Promise<void> {
     await page.evaluate((nextConfigured) => {
-        const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+        const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
         if (plugin === undefined) throw new Error("Self-hosted LiveSync is unavailable");
         const settingDialogue = plugin.core.modules.find(
             (module) => module.constructor.name === "ModuleObsidianSettingDialogue"
@@ -365,7 +365,7 @@ async function openSettingsInitialisationDialogueForInspection(isP2P: boolean): 
     await withObsidianPage(obsidianRemoteDebuggingPort(), async (page) => {
         await page.evaluate(
             ({ stateKey, isP2P }) => {
-                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
                 if (plugin === undefined) throw new Error("Self-hosted LiveSync is unavailable");
                 const manager = plugin.core.modules.find((module) => module.constructor.name === "SetupManager");
                 if (typeof manager?.applySettingsWithInitialisationChoice !== "function") {
@@ -491,7 +491,7 @@ async function verifyCompatibilityReview(): Promise<void> {
 
     await withObsidianPage(port, async (page) => {
         const markerBeforeAcknowledgement = await page.evaluate(async () => {
-            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
             if (plugin === undefined) throw new Error("Self-hosted LiveSync is unavailable");
             return await plugin.core.services.setting.config.getValue("database-compatibility-version", "");
         });
@@ -586,7 +586,7 @@ async function verifyCompatibilityReview(): Promise<void> {
         await summary.waitFor({ state: "hidden", timeout: uiTimeoutMs });
         await page.waitForFunction(
             async (expectedVersion) => {
-                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
                 if (plugin === undefined) return false;
                 const setting = plugin.core.services.setting;
                 return (
@@ -618,7 +618,7 @@ async function verifyConfigDoctorFollowsCompatibilityReview(): Promise<string> {
                 timeout: uiTimeoutMs,
             });
             const chunkSize = await page.evaluate(() => {
-                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
                 return plugin?.core.services.setting.currentSettings().customChunkSize;
             });
             if (chunkSize !== 0) {
@@ -662,7 +662,7 @@ async function verifyBatchSettings(vaultPath: string): Promise<void> {
             await page.waitForFunction(
                 (expected) => {
                     const settings = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins[
-                        "obsidian-livesync"
+                        "livesync-efficient"
                     ]?.core.services.setting.currentSettings();
                     return (
                         settings?.liveSync === expected.liveSync &&
@@ -690,7 +690,7 @@ async function verifyBatchSettings(vaultPath: string): Promise<void> {
             await page.waitForFunction(
                 (value) => {
                     const settings = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins[
-                        "obsidian-livesync"
+                        "livesync-efficient"
                     ]?.core.services.setting.currentSettings();
                     return (
                         settings?.liveSync === (value === "LIVESYNC") &&
@@ -729,7 +729,7 @@ async function verifyBatchSettings(vaultPath: string): Promise<void> {
         await assertState(true, true, false);
         await navigator.close();
         const saved = JSON.parse(
-            await readFile(join(vaultPath, ".obsidian/plugins/obsidian-livesync/data.json"), "utf8")
+            await readFile(join(vaultPath, ".obsidian/plugins/livesync-efficient/data.json"), "utf8")
         );
         if (saved.batchSave !== true || saved.batchSaveInLiveSync !== false || saved.liveSync !== true) {
             throw new Error("The independent batching choices were not saved to plug-in data.");
@@ -750,7 +750,7 @@ async function verifyBatchSettings(vaultPath: string): Promise<void> {
 async function verifyEffectiveSettings(): Promise<"declarative" | "imperative"> {
     return await withObsidianPage(obsidianRemoteDebuggingPort(), async (page) => {
         const sleepPreferences = await page.evaluate(() => {
-            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
             if (plugin === undefined) throw new Error("Self-hosted LiveSync is unavailable");
             const settings = plugin.core.services.setting.currentSettings();
             return {
@@ -832,7 +832,7 @@ async function verifyEffectiveSettings(): Promise<"declarative" | "imperative"> 
         await advancedModeSetting.locator(".checkbox-container").click();
         await page.waitForFunction(
             () => {
-                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
                 return plugin?.core.services.setting.currentSettings().useAdvancedMode === true;
             },
             undefined,
@@ -850,7 +850,7 @@ async function verifyEffectiveSettings(): Promise<"declarative" | "imperative"> 
                 await modeSetting.locator(".checkbox-container").click({ timeout: uiTimeoutMs });
                 await page.waitForFunction(
                     (key) => {
-                        const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+                        const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
                         return plugin?.core.services.setting.currentSettings()[key] === true;
                     },
                     mode.key,
@@ -875,7 +875,7 @@ async function verifyEffectiveSettings(): Promise<"declarative" | "imperative"> 
         }
         await page.waitForFunction(
             () => {
-                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
                 return plugin?.core.services.setting.currentSettings().hashCacheMaxCount === 321;
             },
             undefined,
@@ -990,7 +990,7 @@ async function verifyPendingSettingsInitialisationFlow(): Promise<{ choice: stri
             await edgeCaseMode.locator(".checkbox-container").click({ timeout: uiTimeoutMs });
             await page.waitForFunction(
                 () => {
-                    const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+                    const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
                     return plugin?.core.services.setting.currentSettings().useEdgeCaseMode === true;
                 },
                 undefined,
@@ -1069,7 +1069,7 @@ async function verifyPendingSettingsInitialisationFlow(): Promise<{ choice: stri
         await fallbackDialogue.waitFor({ state: "hidden", timeout: uiTimeoutMs });
 
         const persistedCaseSensitivity = await page.evaluate(() => {
-            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
             if (plugin === undefined) throw new Error("Self-hosted LiveSync is unavailable");
             return plugin.core.settings.handleFilenameCaseSensitive;
         });

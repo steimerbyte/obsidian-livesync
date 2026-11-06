@@ -36,7 +36,7 @@ async function withObsidianPage<T>(port: number, operation: (page: Page) => Prom
         for (const candidate of page.context().pages()) {
             const hasPlugin = await candidate
                 .evaluate(
-                    () => (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"] !== undefined
+                    () => (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"] !== undefined
                 )
                 .catch(() => false);
             if (hasPlugin) return await operation(candidate);
@@ -104,7 +104,7 @@ type ObsidianTestGlobal = typeof globalThis & { app?: ObsidianTestApp };
 async function openRemoteSelectionDialogue(): Promise<void> {
     await withObsidianPage(obsidianRemoteDebuggingPort(), async (page) => {
         await page.evaluate((stateKey) => {
-            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
             if (plugin === undefined) throw new Error("Self-hosted LiveSync is not loaded");
             const manager = plugin.core.modules.find((module) => module.constructor.name === "SetupManager");
             if (typeof manager?.onSelectServer !== "function") throw new Error("Could not find SetupManager");
@@ -128,7 +128,7 @@ async function openP2PRemoteSelectionDialogueForInspection(): Promise<void> {
     await withObsidianPage(obsidianRemoteDebuggingPort(), async (page) => {
         await page.evaluate(
             async ({ stateKey, deviceNameKey, deviceName }) => {
-                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
                 if (plugin === undefined) throw new Error("Self-hosted LiveSync is not loaded");
                 const initialPeerName = plugin.core.settings.P2P_DevicePeerName;
                 if (typeof initialPeerName === "string" && initialPeerName.trim() !== "") {
@@ -209,7 +209,7 @@ async function openSetupUriDialogue(): Promise<void> {
     const opened = await withObsidianPage(obsidianRemoteDebuggingPort(), async (page) => {
         return await page.evaluate(
             (commandId) => (globalThis as ObsidianTestGlobal).app?.commands?.executeCommandById(commandId) === true,
-            "obsidian-livesync:livesync-opensetupuri"
+            "livesync-efficient:livesync-opensetupuri"
         );
     });
     if (!opened) {
@@ -223,7 +223,7 @@ async function openConfigurationMismatchDialogue(
     await withObsidianPage(obsidianRemoteDebuggingPort(), async (page) => {
         await page.evaluate(
             ({ stateKey, kind }) => {
-                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
                 if (plugin === undefined) throw new Error("Self-hosted LiveSync is not loaded");
                 const resolver = plugin.core.modules.find(
                     (module) => module.constructor.name === "ModuleResolvingMismatchedTweaks"
@@ -972,16 +972,16 @@ async function verifyGenerateSetupUriDialogue(mode: DialogueMode): Promise<strin
                 (commandId) => {
                     const app = (globalThis as ObsidianTestGlobal).app;
                     return Boolean(
-                        app?.plugins?.plugins["obsidian-livesync"]?.core?.settings.isConfigured &&
+                        app?.plugins?.plugins["livesync-efficient"]?.core?.settings.isConfigured &&
                         app.commands?.commands?.[commandId]
                     );
                 },
-                "obsidian-livesync:livesync-copysetupuri",
+                "livesync-efficient:livesync-copysetupuri",
                 { timeout: uiTimeoutMs }
             );
             return await page.evaluate(
                 (commandId) => (globalThis as ObsidianTestGlobal).app?.commands?.executeCommandById(commandId) === true,
-                "obsidian-livesync:livesync-copysetupuri"
+                "livesync-efficient:livesync-copysetupuri"
             );
         });
         if (!opened) throw new Error("The Setup URI generation command was not registered.");
@@ -1072,7 +1072,7 @@ async function verifyGenerateSetupUriDialogue(mode: DialogueMode): Promise<strin
 async function verifyCompatibleMismatchAutoAdjustment(): Promise<void> {
     await withObsidianPage(obsidianRemoteDebuggingPort(), async (page) => {
         await page.evaluate((stateKey) => {
-            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
             if (plugin === undefined) throw new Error("Self-hosted LiveSync is not loaded");
             const resolver = plugin.core.modules.find(
                 (module) => module.constructor.name === "ModuleResolvingMismatchedTweaks"
@@ -1127,7 +1127,7 @@ async function verifyCompatibleMismatchAutoAdjustment(): Promise<void> {
     }
     await withObsidianPage(obsidianRemoteDebuggingPort(), async (page) => {
         const autoAcceptEnabled = await page.evaluate(() => {
-            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
             return plugin?.core.settings.autoAcceptCompatibleTweak;
         });
         if (autoAcceptEnabled !== true) {
@@ -1147,7 +1147,7 @@ async function verifyCompatibleMismatchAutoAdjustment(): Promise<void> {
 async function verifyCompatibleAlignmentSettingDefault(): Promise<void> {
     await withObsidianPage(obsidianRemoteDebuggingPort(), async (page) => {
         const persistedValue = await page.evaluate(() => {
-            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
             if (plugin === undefined) throw new Error("Self-hosted LiveSync is not loaded");
             return plugin.core.settings.autoAcceptCompatibleTweak;
         });
@@ -1288,7 +1288,7 @@ async function executeRegisteredCommand(commandId: string): Promise<void> {
 }
 
 async function verifyLogAndReportSurfaces(): Promise<{ log: string; report: string }> {
-    await executeRegisteredCommand("obsidian-livesync:view-log");
+    await executeRegisteredCommand("livesync-efficient:view-log");
     const logScreenshot = await captureObsidianElement(
         obsidianRemoteDebuggingPort(),
         "troubleshooting-show-log.png",
@@ -1311,7 +1311,7 @@ async function verifyLogAndReportSurfaces(): Promise<{ log: string; report: stri
         await logPane.waitFor({ state: "hidden", timeout: uiTimeoutMs });
     });
 
-    await executeRegisteredCommand("obsidian-livesync:dump-debug-info");
+    await executeRegisteredCommand("livesync-efficient:dump-debug-info");
     const reportScreenshot = await captureObsidianElement(
         obsidianRemoteDebuggingPort(),
         "troubleshooting-full-report.png",
@@ -1404,7 +1404,7 @@ async function verifyHatchSurfacesAndSafeActions(): Promise<string> {
         await logSetting.locator(".checkbox-container").click({ timeout: uiTimeoutMs });
         await page.waitForFunction(
             () => {
-                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
                 return plugin?.core.settings.writeLogToTheFile === true;
             },
             undefined,
@@ -1413,7 +1413,7 @@ async function verifyHatchSurfacesAndSafeActions(): Promise<string> {
 
         const persistentLogMarker = "E2E persistent troubleshooting log";
         await page.evaluate((marker) => {
-            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
             if (plugin === undefined) throw new Error("Self-hosted LiveSync is not loaded");
             const module = plugin.core.modules.find((candidate) => candidate.constructor.name === "ModuleLog");
             if (typeof module?.__addLog !== "function") throw new Error("Could not find ModuleLog");
@@ -1443,7 +1443,7 @@ async function verifyHatchSurfacesAndSafeActions(): Promise<string> {
         await refreshedLogToggle.click({ timeout: uiTimeoutMs });
         await page.waitForFunction(
             () => {
-                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+                const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
                 return plugin?.core.settings.writeLogToTheFile === false;
             },
             undefined,
@@ -1466,7 +1466,7 @@ async function verifyHatchSurfacesAndSafeActions(): Promise<string> {
         );
 
         await page.evaluate((stateKey) => {
-            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["obsidian-livesync"];
+            const plugin = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins["livesync-efficient"];
             if (plugin === undefined) throw new Error("Self-hosted LiveSync is not loaded");
             const original = plugin.core.fileHandler.createAllChunks.bind(plugin.core.fileHandler);
             const state: DialogueRunState = { kind: "recreate-missing-chunks", done: false };

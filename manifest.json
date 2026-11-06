@@ -1,7 +1,7 @@
 {
     "id": "livesync-efficient",
     "name": "Self-hosted LiveSync Efficient",
-    "version": "1.0.50",
+    "version": "1.0.51",
     "minAppVersion": "1.7.2",
     "description": "Efficient fork of Self-hosted LiveSync with a load-aware RAM/CPU optimiser and bounded file reads. Reflect your vault changes to other devices immediately. Disable other synchronisation solutions to avoid content corruption or duplication.",
     "author": "steimerbyte",

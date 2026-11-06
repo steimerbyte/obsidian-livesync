@@ -14,7 +14,7 @@ import {
 } from "@vrtmrz/livesync-commonlib/compat/common/types";
 import { scheduleTask } from "octagonal-wheels/concurrency/task";
 import { createOwnedResource, type OwnedResource } from "octagonal-wheels/resource";
-import { fireAndForget, isDirty, throttle } from "@vrtmrz/livesync-commonlib/compat/common/utils";
+import { fireAndForget } from "@vrtmrz/livesync-commonlib/compat/common/utils";
 import {
     chunkFetchCounts,
     pluginScanningCount,
@@ -43,8 +43,11 @@ import {
     createMinimumVisibleActivityCount,
     createPaddedCounterLabel,
 } from "./StatusBarDisplay.ts";
-import { createFastForwardCheckedChangesDisplay, projectReplicationStatusLabel } from "./ReplicationStatusLabel.ts";
-import { createStatusBarRenderer, type StatusBarPart, type StatusBarRenderer } from "./StatusBarRenderer.ts";
+import {
+    createFastForwardCheckedChangesDisplay,
+    projectReplicationStatusLabel,
+    type StatusBarPart,
+} from "./ReplicationStatusLabel.ts";
 import type { LiveSyncCore } from "@/main.ts";
 import { LiveSyncError } from "@vrtmrz/livesync-commonlib/compat/common/LSError";
 import { isValidPath } from "@/common/utils.ts";
@@ -53,11 +56,7 @@ import {
     isValidFilenameInDarwin,
     isValidFilenameInWidows,
 } from "@vrtmrz/livesync-commonlib/compat/string_and_binary/path";
-import {
-    MARK_LOG_NETWORK_ERROR,
-    MARK_LOG_SEPARATOR,
-    type LogFunction,
-} from "@vrtmrz/livesync-commonlib/compat/services/lib/logUtils";
+import { MARK_LOG_NETWORK_ERROR, type LogFunction } from "@vrtmrz/livesync-commonlib/compat/services/lib/logUtils";
 import { NetworkWarningStyles } from "@vrtmrz/livesync-commonlib/compat/common/models/setting.const";
 import { compatGlobal } from "@vrtmrz/livesync-commonlib/compat/common/coreEnvFunctions";
 import { generateReport } from "@/common/reportTool.ts";
@@ -142,16 +141,6 @@ export class ModuleLog extends AbstractObsidianModule {
         entries.forEach((entry) => this.__addLog(entry.message, entry.level, entry.key));
     };
 
-    statusBar?: HTMLElement;
-
-    statusDiv?: HTMLElement;
-    statusLine?: HTMLDivElement;
-    logMessage?: HTMLDivElement;
-    logHistory?: HTMLDivElement;
-    messageArea?: HTMLDivElement;
-
-    statusBarRenderer?: StatusBarRenderer;
-    statusLineRenderer?: StatusBarRenderer;
     statusBarLabels!: ReactiveValue<{
         message: string;
         status: string;
@@ -159,6 +148,7 @@ export class ModuleLog extends AbstractObsidianModule {
         statusBarParts: readonly StatusBarPart[];
     }>;
     statusLog = reactiveSource("");
+    statusMessages = reactiveSource("");
     activeFileStatus = reactiveSource("");
     notifies: { [key: string]: { count: number } } = {};
     p2pLogCollector = new P2PLogCollector(this.services.context.events);
@@ -265,16 +255,7 @@ export class ModuleLog extends AbstractObsidianModule {
             };
         });
         this.statusBarLabels = statusBarLabels;
-
-        // Mobile repaints a full-width overlay; the desktop cadence is far too hot for it.
-        const applyToDisplay = throttle(
-            (label: typeof statusBarLabels.value) => {
-                // const v = label;
-                this.applyStatusBarText();
-            },
-            this.services.API.isMobile() ? 250 : 20
-        );
-        statusBarLabels.onChanged((label) => applyToDisplay(label.value));
+        statusBarLabels.onChanged(() => this.applyStatusBarText());
         this.activeFileStatus.onChanged(() => this.updateMessageArea());
     }
 
@@ -284,15 +265,6 @@ export class ModuleLog extends AbstractObsidianModule {
         eventHub.onEvent(EVENT_ON_UNRESOLVED_ERROR, () => this.updateMessageArea());
 
         return Promise.resolve(true);
-    }
-    adjustStatusDivPosition() {
-        const mdv = this.app.workspace.getMostRecentLeaf();
-        if (mdv && this.statusDiv) {
-            this.statusDiv.remove();
-            // this.statusDiv.pa();
-            const container = mdv.view.containerEl;
-            container.appendChild(this.statusDiv);
-        }
     }
 
     async getActiveFileStatus() {
@@ -349,17 +321,6 @@ export class ModuleLog extends AbstractObsidianModule {
     }
 
     async updateMessageArea() {
-        if (!this.messageArea) return;
-
-        const showStatusOnEditor = this.settings?.showStatusOnEditor ?? false;
-        if (this.statusDiv) {
-            this.statusDiv.setCssStyles({ display: showStatusOnEditor ? "" : "none" });
-        }
-        if (!showStatusOnEditor) {
-            this.messageArea.innerText = "";
-            return;
-        }
-
         const messageLines = [];
         const fileStatus = this.activeFileStatus.value;
         if (fileStatus && !this.settings.hideFileWarningNotice) messageLines.push(fileStatus);
@@ -378,60 +339,18 @@ export class ModuleLog extends AbstractObsidianModule {
         } else if (this.settings.networkWarningStyle === NetworkWarningStyles.ICON) {
             if (networkMessages.length > 0) messageLines.push("🔗❌");
         }
-        this.messageArea.innerText = messageLines.map((e) => `⚠️ ${e}`).join("\n");
+        this.statusMessages.value = messageLines.map((e) => `⚠️ ${e}`).join("\n");
     }
 
     onActiveLeafChange() {
         fireAndForget(async () => {
-            this.adjustStatusDivPosition();
             await this.setFileStatus();
         });
     }
 
-    nextFrameQueue: ReturnType<typeof compatGlobal.requestAnimationFrame> | undefined = undefined;
-    logLines: { ttl: number; message: string }[] = [];
+    logLines: string[] = [];
 
     applyStatusBarText() {
-        if (this.nextFrameQueue) {
-            return;
-        }
-        this.nextFrameQueue = compatGlobal.requestAnimationFrame(() => {
-            this.nextFrameQueue = undefined;
-            const { message, status, parts, statusBarParts } = this.statusBarLabels.value;
-            // const recent = logMessages.value;
-            const newMsg = message;
-            let newLog = this.settings?.showOnlyIconsOnEditor ? "" : status;
-            const moduleTagEnd = newLog.indexOf(`]${MARK_LOG_SEPARATOR}`);
-            if (moduleTagEnd != -1) {
-                newLog = newLog.substring(moduleTagEnd + MARK_LOG_SEPARATOR.length + 1);
-            }
-
-            this.statusBarRenderer?.render(statusBarParts);
-            if (this.statusDiv) {
-                this.statusDiv.setCssStyles({ display: this.settings?.showStatusOnEditor ? "" : "none" });
-            }
-            if (this.settings?.showStatusOnEditor && this.statusDiv) {
-                if (this.settings.showLongerLogInsideEditor) {
-                    const now = new Date().getTime();
-                    this.logLines = this.logLines.filter((e) => e.ttl > now);
-                    const minimumNext = this.logLines.reduce(
-                        (a, b) => (a < b.ttl ? a : b.ttl),
-                        Number.MAX_SAFE_INTEGER
-                    );
-                    if (this.logLines.length > 0)
-                        compatGlobal.setTimeout(() => this.applyStatusBarText(), minimumNext - now);
-                    const recent = this.logLines.map((e) => e.message);
-                    const recentLogs = recent.reverse().join("\n");
-                    if (isDirty("recentLogs", recentLogs)) this.logHistory!.innerText = recentLogs;
-                }
-                if (isDirty("newMsg", newMsg)) this.statusLineRenderer?.render(parts);
-                if (isDirty("newLog", newLog)) this.logMessage!.innerText = newLog;
-            } else {
-                // const root = activeDocument.documentElement;
-                // root.style.setProperty("--log-text", "'" + (newMsg + "\\A " + newLog) + "'");
-            }
-        });
-
         scheduleTask("log-hide", 3000, () => {
             this.statusLog.value = "";
         });
@@ -442,9 +361,6 @@ export class ModuleLog extends AbstractObsidianModule {
             this.services.context.notices.hide(`log:${key}`);
         }
         this.notifies = {};
-        if (this.statusDiv) {
-            this.statusDiv.remove();
-        }
         compatGlobal.document.querySelectorAll(`.livesync-status`)?.forEach((e) => e.remove());
         return Promise.resolve(true);
     }
@@ -502,44 +418,6 @@ ${stringifyYaml(info)}
 
         this.observeForLogs();
 
-        if (this.settings.showStatusOnEditor) {
-            this.statusDiv = this.app.workspace.containerEl.createDiv({ cls: "livesync-status" });
-            // The counters and the rolling log line are decoration for sighted users; only the
-            // warnings in the message area are worth announcing.
-            this.statusLine = this.statusDiv.createDiv({
-                cls: "livesync-status-statusline",
-                attr: { "aria-hidden": "true" },
-            });
-            this.messageArea = this.statusDiv.createDiv({
-                cls: "livesync-status-messagearea",
-                attr: { role: "status" },
-            });
-            this.logMessage = this.statusDiv.createDiv({
-                cls: "livesync-status-logmessage",
-                attr: { "aria-hidden": "true" },
-            });
-            this.logHistory = this.statusDiv.createDiv({
-                cls: "livesync-status-loghistory",
-                attr: { "aria-hidden": "true" },
-            });
-            this.statusDiv.setCssStyles({ display: this.settings?.showStatusOnEditor ? "" : "none" });
-        }
-        eventHub.onEvent(EVENT_LAYOUT_READY, () => this.adjustStatusDivPosition());
-        if (this.settings?.showStatusOnStatusbar) {
-            this.statusBar = this.services.API.addStatusBarItem();
-            this.statusBar?.addClass("syncstatusbar");
-        }
-        if (this.statusLine) {
-            const renderer = createStatusBarRenderer(this.statusLine);
-            this.statusLineRenderer = renderer;
-            this.plugin.register(() => renderer.dispose());
-        }
-        if (this.statusBar) {
-            const renderer = createStatusBarRenderer(this.statusBar);
-            this.statusBarRenderer = renderer;
-            this.plugin.register(() => renderer.dispose());
-        }
-        this.adjustStatusDivPosition();
         this._log("Log module loaded", LOG_LEVEL_INFO);
         this._log("Verbose log", LOG_LEVEL_VERBOSE);
         return Promise.resolve(true);
@@ -605,15 +483,11 @@ ${stringifyYaml(info)}
             return;
         }
         addDisplayLog(newMessage);
-        if (!this.settings?.showOnlyIconsOnEditor) {
-            this.statusLog.value = messageContent;
-        }
-        if (this.settings?.showLongerLogInsideEditor) {
-            this.logLines.push({ ttl: now.getTime() + 3000, message: newMessage });
-            // The history is only rendered while the longer log is enabled; keep it bounded like logForDisplay.
-            while (this.logLines.length > 200) {
-                this.logLines.shift();
-            }
+        this.statusLog.value = messageContent;
+        this.logLines.push(newMessage);
+        // Keep the rolling history bounded like logForDisplay.
+        while (this.logLines.length > 200) {
+            this.logLines.shift();
         }
 
         if (level >= LOG_LEVEL_NOTICE) {

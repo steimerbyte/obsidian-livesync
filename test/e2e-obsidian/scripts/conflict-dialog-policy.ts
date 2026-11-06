@@ -71,7 +71,7 @@ async function recordConflictDiagnostics(port: number, label: string) {
         async (page) =>
             await page.evaluate(() => {
                 const host = globalThis as ObsidianTestGlobal;
-                const plugin = host.app?.plugins?.plugins?.["obsidian-livesync"];
+                const plugin = host.app?.plugins?.plugins?.["livesync-efficient"];
                 const conflict = host.__livesyncObservedConflict ?? plugin?.core?.services?.conflict;
                 return {
                     pluginLoaded: plugin !== undefined,
@@ -129,7 +129,7 @@ async function createManualConflict(
             `const path=${JSON.stringify(targetPath)};`,
             `const baseRev=${JSON.stringify(baseRev)};`,
             `const contents=${JSON.stringify(contents)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const id=await core.services.path.path2id(path);",
             "for(const [index,content] of contents.entries()){",
             "  const blob=new Blob([content],{type:'text/plain'});",
@@ -162,7 +162,7 @@ async function readConflictFixture(
         [
             "(async()=>{",
             `const path=${JSON.stringify(targetPath)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const meta=await core.localDatabase.getDBEntryMeta(path,{conflicts:true,revs:true},true);",
             "if(!meta?._rev){",
             "  throw new Error(`Could not read the conflict fixture: ${path}`);",
@@ -210,7 +210,7 @@ async function requestConflictCheck(
             "(async()=>{",
             `const path=${JSON.stringify(targetPath)};`,
             `const waitForCompletion=${JSON.stringify(waitForCompletion)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "await core.services.conflict.queueCheckFor(path);",
             "if(waitForCompletion){",
             "  await core.services.conflict.ensureAllProcessed();",
@@ -227,7 +227,7 @@ async function waitForConflictChecks(cliBinary: string, env: NodeJS.ProcessEnv):
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "await core.services.conflict.ensureAllProcessed();",
             "return JSON.stringify({ok:true});",
             "})()",
@@ -250,7 +250,7 @@ async function applyReplicatedConflictResolution(
             `const path=${JSON.stringify(targetPath)};`,
             `const revisionToDelete=${JSON.stringify(revisionToDelete)};`,
             `const expectedConflictCount=${JSON.stringify(expectedConflictCount)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "if(!(await core.fileHandler.deleteRevisionFromDB(path,revisionToDelete))){",
             "  throw new Error(`Could not apply the replicated conflict resolution: ${path} ${revisionToDelete}`);",
             "}",
@@ -273,11 +273,37 @@ async function applyReplicatedConflictResolution(
     );
 }
 
-function conflictDialogue(page: Parameters<Parameters<typeof withObsidianPage>[1]>[0], targetPath?: string) {
+type ConflictPage = Parameters<Parameters<typeof withObsidianPage>[1]>[0];
+
+const liveStatusSelector = ".livesync-bubble .lsb-live-status";
+
+function conflictDialogue(page: ConflictPage, targetPath?: string) {
     const dialogues = page.locator(".modal-container").filter({
         has: page.locator(".modal-title").filter({ hasText: "Conflicting changes" }),
     });
     return targetPath === undefined ? dialogues : dialogues.filter({ hasText: targetPath });
+}
+
+/** The card is collapsed until its orb is clicked; DOM clicks also work beneath the dialogue modal. */
+async function openStatusBubble(page: ConflictPage): Promise<void> {
+    await page.locator(".livesync-bubble").waitFor({ state: "attached", timeout: uiTimeoutMs });
+    await page.evaluate(() => {
+        const bubble = document.querySelector<HTMLElement>(".livesync-bubble");
+        if (!bubble || bubble.classList.contains("is-open")) return;
+        bubble.querySelector<HTMLElement>(".lsb-orb")?.click();
+    });
+}
+
+async function waitForStatusText(page: ConflictPage, text: string, present: boolean): Promise<void> {
+    await openStatusBubble(page);
+    await page.waitForFunction(
+        ({ selector, text, present }) => {
+            const live = document.querySelector<HTMLElement>(selector)?.textContent ?? "";
+            return live.includes(text) === present;
+        },
+        { selector: liveStatusSelector, text, present },
+        { timeout: uiTimeoutMs }
+    );
 }
 
 async function createTwoVersionConflict(
@@ -304,7 +330,7 @@ async function setShowMergeDialogOnlyOnActive(
         [
             "(()=>{",
             `const enabled=${JSON.stringify(enabled)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "core.settings.showMergeDialogOnlyOnActive=enabled;",
             "return JSON.stringify({ok:true});",
             "})()",
@@ -325,7 +351,7 @@ async function requestRepeatedConflictChecks(
             "(async()=>{",
             `const path=${JSON.stringify(targetPath)};`,
             `const count=${JSON.stringify(count)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "await Promise.all(Array.from({length:count},()=>core.services.conflict.queueCheckFor(path)));",
             "return JSON.stringify({ok:true});",
             "})()",
@@ -349,7 +375,7 @@ async function requestInteractiveConflictResolution(
             `const currentRev=${JSON.stringify(fixture.currentRev)};`,
             `const conflictRev=${JSON.stringify(fixture.conflicts[0])};`,
             `const trackCompletion=${JSON.stringify(trackCompletion)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "if(trackCompletion){",
             "  globalThis.__livesyncWaitingConflictCompleted=false;",
             "  globalThis.__livesyncWaitingConflictError=undefined;",
@@ -374,7 +400,7 @@ async function disableLiveSyncAndWaitForConflictChecks(port: number): Promise<vo
     await withObsidianPage(port, async (page) => {
         await page.evaluate(() => {
             const host = globalThis as ObsidianTestGlobal;
-            const conflict = host.app?.plugins?.plugins?.["obsidian-livesync"]?.core?.services?.conflict;
+            const conflict = host.app?.plugins?.plugins?.["livesync-efficient"]?.core?.services?.conflict;
             if (conflict === undefined) throw new Error("LiveSync conflict service is unavailable before unload");
             host.__livesyncObservedConflict = conflict;
             host.__livesyncConflictChecksCompleted = false;
@@ -394,7 +420,7 @@ async function disableLiveSyncAndWaitForConflictChecks(port: number): Promise<vo
         await page.evaluate(async () => {
             const plugins = (globalThis as ObsidianTestGlobal).app?.plugins;
             if (plugins === undefined) throw new Error("Obsidian plug-in manager is unavailable");
-            await plugins.disablePlugin("obsidian-livesync");
+            await plugins.disablePlugin("livesync-efficient");
         });
         await conflictDialogue(page).waitFor({ state: "hidden", timeout: uiTimeoutMs });
         await page.waitForFunction(
@@ -417,7 +443,7 @@ async function enableLiveSync(port: number): Promise<void> {
         await page.evaluate(async () => {
             const plugins = (globalThis as ObsidianTestGlobal).app?.plugins;
             if (plugins === undefined) throw new Error("Obsidian plug-in manager is unavailable");
-            await plugins.enablePlugin("obsidian-livesync");
+            await plugins.enablePlugin("livesync-efficient");
         });
     });
 }
@@ -443,7 +469,7 @@ async function recordUnloadPreservation(
         [
             "(async()=>{",
             `const fixtures=${JSON.stringify(fixtures)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "const contentOf=(entry)=>entry===false?false:Array.isArray(entry.data)?entry.data.join(''):entry.data;",
             "const states=[];",
             "for(const {path,fixture} of fixtures){",
@@ -529,7 +555,6 @@ async function main(): Promise<void> {
                 syncOnStart: false,
                 disableMarkdownAutoMerge: true,
                 showMergeDialogOnlyOnActive: true,
-                showStatusOnEditor: true,
             },
             localStorageEntries: createE2eObsidianDeviceLocalState(vault.name),
         });
@@ -549,12 +574,11 @@ async function main(): Promise<void> {
         await withObsidianPage(session.remoteDebuggingPort, async (page) => {
             const modal = conflictDialogue(page);
             await modal.waitFor({ state: "visible", timeout: uiTimeoutMs });
-            await page
-                .locator(".livesync-status-messagearea")
-                .filter({
-                    hasText: "This file has 3 unresolved versions. They will be reviewed one pair at a time.",
-                })
-                .waitFor({ state: "visible", timeout: uiTimeoutMs });
+            await waitForStatusText(
+                page,
+                "This file has 3 unresolved versions. They will be reviewed one pair at a time.",
+                true
+            );
             await modal.getByRole("button", { name: "Concat both", exact: true }).waitFor({
                 state: "visible",
                 timeout: uiTimeoutMs,
@@ -614,20 +638,17 @@ async function main(): Promise<void> {
         await withObsidianPage(session.remoteDebuggingPort, async (page) => {
             const modal = conflictDialogue(page);
             await modal.waitFor({ state: "visible", timeout: uiTimeoutMs });
-            const warning = page.locator(".livesync-status-messagearea").filter({
-                hasText: "This file has unresolved conflicts.",
-            });
-            await warning.waitFor({ state: "visible", timeout: uiTimeoutMs });
+            await waitForStatusText(page, "This file has unresolved conflicts.", true);
             await modal.getByRole("button", { name: "Not now", exact: true }).click({ timeout: uiTimeoutMs });
             await modal.waitFor({ state: "hidden", timeout: uiTimeoutMs });
         });
         const warningScreenshot = await captureObsidianElement(
             session.remoteDebuggingPort,
             "conflict-dialog-postponed-warning.png",
-            (page) =>
-                page.locator(".livesync-status-messagearea").filter({
-                    hasText: "This file has unresolved conflicts.",
-                })
+            async (page) => {
+                await openStatusBubble(page);
+                return page.locator(liveStatusSelector);
+            }
         );
 
         await session.app.stop();
@@ -648,20 +669,14 @@ async function main(): Promise<void> {
         await withObsidianPage(restartedSession.remoteDebuggingPort, async (page) => {
             const modal = conflictDialogue(page);
             await modal.waitFor({ state: "visible", timeout: uiTimeoutMs });
-            await page
-                .locator(".livesync-status-messagearea")
-                .filter({ hasText: "This file has unresolved conflicts." })
-                .waitFor({ state: "visible", timeout: uiTimeoutMs });
+            await waitForStatusText(page, "This file has unresolved conflicts.", true);
             await applyReplicatedConflictResolution(
                 cliBinary,
                 restartedSession.cliEnv,
                 remainingAfterRestart.conflicts[0]
             );
             await modal.waitFor({ state: "hidden", timeout: uiTimeoutMs });
-            await page
-                .locator(".livesync-status-messagearea")
-                .filter({ hasText: "This file has unresolved conflicts." })
-                .waitFor({ state: "hidden", timeout: uiTimeoutMs });
+            await waitForStatusText(page, "This file has unresolved conflicts.", false);
         });
 
         // End the replicated-resolution episode before creating another
@@ -708,7 +723,7 @@ async function main(): Promise<void> {
         const laterCommandExecuted = await withObsidianPage(session.remoteDebuggingPort, async (page) => {
             return await page.evaluate(
                 (commandId) => (globalThis as ObsidianTestGlobal).app?.commands?.executeCommandById(commandId) === true,
-                "obsidian-livesync:livesync-checkdoc-conflicted"
+                "livesync-efficient:livesync-checkdoc-conflicted"
             );
         });
         if (!laterCommandExecuted) {
@@ -720,10 +735,7 @@ async function main(): Promise<void> {
             await modal.waitFor({ state: "visible", timeout: uiTimeoutMs });
             await applyReplicatedConflictResolution(cliBinary, laterActiveSession.cliEnv, laterFixture.conflicts[0]);
             await modal.waitFor({ state: "hidden", timeout: uiTimeoutMs });
-            await page
-                .locator(".livesync-status-messagearea")
-                .filter({ hasText: "This file has unresolved conflicts." })
-                .waitFor({ state: "hidden", timeout: uiTimeoutMs });
+            await waitForStatusText(page, "This file has unresolved conflicts.", false);
         });
 
         // Keep concurrent manual comparisons independent from the active-file
@@ -746,7 +758,7 @@ async function main(): Promise<void> {
             // while its dialogue waits for a response; earlier checks also count.
             await page.waitForFunction(
                 (targetPath) => {
-                    const conflict = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins?.["obsidian-livesync"]
+                    const conflict = (globalThis as ObsidianTestGlobal).app?.plugins?.plugins?.["livesync-efficient"]
                         ?.core?.services?.conflict;
                     const visible = Array.from(document.querySelectorAll(".modal-container")).filter(
                         (element) =>
@@ -905,7 +917,7 @@ async function main(): Promise<void> {
                     throw new Error("A conflict dialogue remained visible after LiveSync was unloaded");
                 }
                 const pluginStillLoaded = await page.evaluate(
-                    () => (globalThis as ObsidianTestGlobal).app?.plugins?.plugins?.["obsidian-livesync"] !== undefined
+                    () => (globalThis as ObsidianTestGlobal).app?.plugins?.plugins?.["livesync-efficient"] !== undefined
                 );
                 if (pluginStillLoaded) throw new Error("LiveSync remained loaded after disablePlugin completed");
             }

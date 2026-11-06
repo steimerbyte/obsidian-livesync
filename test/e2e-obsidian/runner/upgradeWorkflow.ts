@@ -1,4 +1,4 @@
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { evalObsidianJson } from "./cli.ts";
 import type { CouchDbConfig } from "./couchdb.ts";
@@ -10,6 +10,7 @@ import type {
     JournalIoObservation,
 } from "./upgradeContinuity.ts";
 import { waitForLocalDatabaseEntry } from "./liveSyncWorkflow.ts";
+import { FORK_PLUGIN_ID, liveSyncPluginLookup, pluginIdFromEnvironment } from "./session.ts";
 import type { TemporaryVault } from "./vault.ts";
 
 export const STABLE_RELEASE_VERSION = "0.25.83";
@@ -160,6 +161,14 @@ function remoteSettings(configuration: UpgradeTransportConfiguration): Record<st
     };
 }
 
+/** Applies the documented fork migration: move the old plug-in folder to this fork's id. */
+export async function migratePluginFolder(vault: Pick<TemporaryVault, "path">, fromPluginId: string): Promise<void> {
+    const plugins = join(vault.path, ".obsidian", "plugins");
+    await rename(join(plugins, fromPluginId), join(plugins, FORK_PLUGIN_ID)).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== "ENOENT") throw error;
+    });
+}
+
 export async function configureStableRelease(
     cliBinary: string,
     environment: NodeJS.ProcessEnv,
@@ -170,7 +179,7 @@ export async function configureStableRelease(
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            `const core=${liveSyncPluginLookup(environment)}.core;`,
             `const partial=${JSON.stringify(partial)};`,
             "await core.services.setting.applyExternalSettings(partial,true);",
             "await core.services.control.applySettings();",
@@ -186,7 +195,7 @@ export async function prepareStableRemote(cliBinary: string, environment: NodeJS
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            `const core=${liveSyncPluginLookup(environment)}.core;`,
             "const settings=core.services.setting.currentSettings();",
             "const replicator=core.services.replicator.getActiveReplicator();",
             "await replicator.tryCreateRemoteDatabase(settings);",
@@ -205,7 +214,7 @@ export async function prepareStableRemote(cliBinary: string, environment: NodeJS
             cliBinary,
             [
                 "(async()=>{",
-                "const core=app.plugins.plugins['obsidian-livesync'].core;",
+                `const core=${liveSyncPluginLookup(environment)}.core;`,
                 "const settings=core.services.setting.currentSettings();",
                 "const replicator=core.services.replicator.getActiveReplicator();",
                 "return JSON.stringify(!!(await replicator.ensurePBKDF2Salt(settings,true,false)));",
@@ -224,7 +233,7 @@ export async function prepareStableRemote(cliBinary: string, environment: NodeJS
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            `const core=${liveSyncPluginLookup(environment)}.core;`,
             "const settings=core.services.setting.currentSettings();",
             "const replicator=core.services.replicator.getActiveReplicator();",
             "await replicator.markRemoteResolved(settings);",
@@ -245,7 +254,7 @@ export async function waitForPersistentNodeIdentity(
         [
             "(async()=>{",
             `const deadline=Date.now()+${JSON.stringify(timeoutMs)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            `const core=${liveSyncPluginLookup(environment)}.core;`,
             "const database=core.localDatabase.localDatabase;",
             "const sleep=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms));",
             "let persistent='';let active='';",
@@ -271,7 +280,7 @@ export async function readRuntimeUpgradeState(
         cliBinary,
         [
             "(async()=>{",
-            "const plugin=app.plugins.plugins['obsidian-livesync'];",
+            `const plugin=${liveSyncPluginLookup(environment)};`,
             "const core=plugin.core;",
             "const setting=core.services.setting;",
             "const settings=setting.currentSettings();",
@@ -281,7 +290,7 @@ export async function readRuntimeUpgradeState(
             "const nodeInfo=await core.localDatabase.localDatabase.get('_local/obsydian_livesync_nodeinfo').catch(()=>null);",
             "const migrationState=setting.getSettingsMigrationState?.();",
             "return JSON.stringify({",
-            "pluginVersion:app.plugins.manifests['obsidian-livesync']?.version??'unknown',",
+            `pluginVersion:app.plugins.manifests[${JSON.stringify(pluginIdFromEnvironment(environment))}]?.version??'unknown',`,
             "vaultName,",
             "localDatabaseName:databaseInfo.db_name,",
             "localDatabaseUpdateSequence:databaseInfo.update_seq,",
@@ -329,12 +338,12 @@ export async function readRuntimeSettingsUpgradeState(
         cliBinary,
         [
             "(async()=>{",
-            "const plugin=app.plugins.plugins['obsidian-livesync'];",
+            `const plugin=${liveSyncPluginLookup(environment)};`,
             "const setting=plugin.core.services.setting;",
             "const settings=setting.currentSettings();",
             "const migrationState=setting.getSettingsMigrationState?.();",
             "return JSON.stringify({",
-            "pluginVersion:app.plugins.manifests['obsidian-livesync']?.version??'unknown',",
+            `pluginVersion:app.plugins.manifests[${JSON.stringify(pluginIdFromEnvironment(environment))}]?.version??'unknown',`,
             "compatibilityMarker:await (setting.config?.getValue?.('database-compatibility-version','')??Promise.resolve(setting.getSmallConfig?.('database-compatibility-version')??'')),",
             "migrationState,",
             "settings:{",
@@ -669,7 +678,7 @@ async function waitForChangedRevision(
             `const path=${JSON.stringify(path)};`,
             `const previousRevision=${JSON.stringify(previousRevision)};`,
             `const deadline=Date.now()+${JSON.stringify(timeoutMs)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            `const core=${liveSyncPluginLookup(environment)}.core;`,
             "const sleep=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms));",
             "while(Date.now()<deadline){",
             "await core.services.fileProcessing.commitPendingFileEvents();",
@@ -778,7 +787,7 @@ export async function runCouchDbReplicationObserved(
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            `const core=${liveSyncPluginLookup(environment)}.core;`,
             "const replicator=core.services.replicator.getActiveReplicator();",
             "await core.services.fileProcessing.commitPendingFileEvents();",
             "const beforeSent=Number(replicator.docSent??0);",
@@ -803,7 +812,7 @@ export async function runJournalReplicationObserved(
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            `const core=${liveSyncPluginLookup(environment)}.core;`,
             "const replicator=core.services.replicator.getActiveReplicator();",
             "const client=replicator.client;",
             "const storage=client.storage;",
@@ -833,7 +842,7 @@ export async function readJournalCheckpoint(
         cliBinary,
         [
             "(async()=>{",
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            `const core=${liveSyncPluginLookup(environment)}.core;`,
             "const replicator=core.services.replicator.getActiveReplicator();",
             "const client=replicator.client;",
             "const checkpoint=await client.getCheckpointInfo();",
@@ -859,7 +868,7 @@ export async function readLocalCouchDbCheckpoints(
         [
             "(async()=>{",
             `const ids=${JSON.stringify(checkpointIds)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            `const core=${liveSyncPluginLookup(environment)}.core;`,
             "const database=core.localDatabase.localDatabase;",
             "const checkpoints=[];",
             "for(const id of ids){",

@@ -7,7 +7,6 @@ import { renderLegacySettingSpec } from "./SettingSpec.ts";
 export function paneGeneral(this: ObsidianLiveSyncSettingTab, paneEl: HTMLElement, { addPanel }: PageFunctions): void {
     const groups = [
         ...createGeneralSettingSpecGroups({
-            showEditorStatusDetails: () => this.isConfiguredAs("showStatusOnEditor", true),
             showVerboseLog: () => this.isConfiguredAs("lessInformationInLog", false),
         }),
         createExtraMenuSettingSpecGroup(),

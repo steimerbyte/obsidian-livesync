@@ -73,7 +73,7 @@ async function main(): Promise<void> {
         return await evalObsidianJson<T>(
             cliBinary,
             `(async()=>{
-            const core=app.plugins.plugins['obsidian-livesync'].core;
+            const core=app.plugins.plugins['livesync-efficient'].core;
             const manager=core.serviceModules.storageAccess.vaultManager;
             const config=core.getAddOn('ConfigSync');
             const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));

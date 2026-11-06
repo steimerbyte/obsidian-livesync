@@ -48,7 +48,7 @@ async function applyObsidianMobileTestMode(
                     return (
                         document.body.classList.contains("is-mobile") === nextEnabled &&
                         obsidianApp?.workspace?.layoutReady === true &&
-                        (!waitForLiveSync || obsidianApp?.plugins?.plugins["obsidian-livesync"] !== undefined)
+                        (!waitForLiveSync || obsidianApp?.plugins?.plugins["livesync-efficient"] !== undefined)
                     );
                 },
                 { nextEnabled: enabled, waitForLiveSync },
@@ -61,7 +61,7 @@ async function applyObsidianMobileTestMode(
                     appIsMobile: obsidianApp?.isMobile ?? null,
                     bodyClasses: document.body.className,
                     documentReadyState: document.readyState,
-                    liveSyncLoaded: obsidianApp?.plugins?.plugins["obsidian-livesync"] !== undefined,
+                    liveSyncLoaded: obsidianApp?.plugins?.plugins["livesync-efficient"] !== undefined,
                     viewport: { width: window.innerWidth, height: window.innerHeight },
                     workspaceLayoutReady: obsidianApp?.workspace?.layoutReady ?? null,
                 };

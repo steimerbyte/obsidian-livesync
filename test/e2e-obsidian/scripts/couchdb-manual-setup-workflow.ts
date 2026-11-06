@@ -423,7 +423,7 @@ async function readChunkInventory(context: RunnerContext, session: ObsidianLiveS
     return await evalObsidianJson<string[]>(
         context.cliBinary,
         `(async()=>{
-            const core=app.plugins.plugins['obsidian-livesync'].core;
+            const core=app.plugins.plugins['livesync-efficient'].core;
             const rows=(await core.localDatabase.allDocsRaw({include_docs:true})).rows;
             return JSON.stringify(rows.filter(row=>row.doc?.type==='leaf').map(row=>row.id).sort());
         })()`,
@@ -440,7 +440,7 @@ async function waitForRemoteEntry(context: RunnerContext, entry: { id: string; c
 
 async function assertPersistedE2EE(vault: TemporaryVault, independentIdSource?: string): Promise<void> {
     const rawSettings = await readFile(
-        join(vault.path, ".obsidian", "plugins", "obsidian-livesync", "data.json"),
+        join(vault.path, ".obsidian", "plugins", "livesync-efficient", "data.json"),
         "utf8"
     );
     const persisted = JSON.parse(rawSettings) as {
@@ -474,7 +474,7 @@ async function assertRestoredE2EEPassphrase(session: ObsidianLiveSyncSession, cl
         cliBinary,
         [
             "(()=>{",
-            "const settings=app.plugins.plugins['obsidian-livesync'].core.services.setting.currentSettings();",
+            "const settings=app.plugins.plugins['livesync-efficient'].core.services.setting.currentSettings();",
             `return JSON.stringify(settings.passphrase === ${JSON.stringify(e2eePassphrase)});`,
             "})()",
         ].join(""),
@@ -493,7 +493,7 @@ async function assertCurrentIdDerivationKey(
         cliBinary,
         [
             "(()=>{",
-            "const settings=app.plugins.plugins['obsidian-livesync'].core.services.setting.currentSettings();",
+            "const settings=app.plugins.plugins['livesync-efficient'].core.services.setting.currentSettings();",
             "return JSON.stringify({idDerivationVersion:settings.idDerivationVersion,idDerivationKey:settings.idDerivationKey});",
             "})()",
         ].join(""),
@@ -595,7 +595,7 @@ async function readDocumentId(cliBinary: string, environment: NodeJS.ProcessEnv,
         [
             "(async()=>{",
             `const path=${JSON.stringify(path)};`,
-            "const core=app.plugins.plugins['obsidian-livesync'].core;",
+            "const core=app.plugins.plugins['livesync-efficient'].core;",
             "return JSON.stringify(await core.services.path.path2id(path));",
             "})()",
         ].join(""),
@@ -752,7 +752,7 @@ async function main(): Promise<void> {
             await writeNoteViaObsidian(context.cliBinary, session.cliEnv, notePath, noteContent);
             const size = await evalObsidianJson<number>(
                 context.cliBinary,
-                `JSON.stringify(app.plugins.plugins['obsidian-livesync'].core.settings.customChunkSize)`,
+                `JSON.stringify(app.plugins.plugins['livesync-efficient'].core.settings.customChunkSize)`,
                 session.cliEnv
             );
             assertEqual(size, 0, "New manual setup did not retain the common Chunk-size recommendation.");

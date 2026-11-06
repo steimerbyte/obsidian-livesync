@@ -399,7 +399,7 @@ describe("workspace version update", () => {
             });
         }
         writeJson(directory, "package-lock.json", {
-            name: "obsidian-livesync",
+            name: "livesync-efficient",
             version: "0.25.80",
             lockfileVersion: 3,
             packages: {

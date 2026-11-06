@@ -12,6 +12,20 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+## 1.0.51
+
+6th November, 2026
+
+### Changed
+
+- The status bubble is now the only status surface. The in-editor text overlay and the Obsidian status-bar item are gone, and their three settings are no longer shown.
+- The orb is 36 px and uses only Obsidian theme colour variables.
+- Expanding the card shows the headline and detail, progress, actions, six always-current category rows (Initialisation, Replication, Sync, Config sync, Storage, Warnings) with green, yellow, and red dots, and a scrollable raw live log of the newest eight lines.
+
+### Internal
+
+- The e2e runner uses the fork plugin id and migrates the plugin folder for upgrade scenarios.
+
 ## 1.0.50
 
 6th November, 2026

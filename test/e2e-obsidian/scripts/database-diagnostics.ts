@@ -47,7 +47,7 @@ async function openCommand(page: Page, kind: "usage" | "integrity") {
     const id = kind === "usage" ? "analyse-database" : "inspect-database-integrity";
     const opened = await page.evaluate(
         (command) => (globalThis as DiagnosticPageGlobal).app.commands.executeCommandById(command),
-        `obsidian-livesync:${id}`
+        `livesync-efficient:${id}`
     );
     assert.equal(opened, true);
     const dialogue = page.locator(".database-diagnostic");
@@ -145,7 +145,7 @@ async function assertMobileRadioTargets(page: Page, dialogue: Locator, name: str
 async function readDatabaseState(cli: string, session: ObsidianLiveSyncSession) {
     return await evalObsidianJson<{ sequence: unknown; settings: string; names: string[] }>(
         cli,
-        "(async()=>{const core=app.plugins.plugins['obsidian-livesync'].core;return JSON.stringify({sequence:(await core.localDatabase.localDatabase.info()).update_seq,settings:JSON.stringify(core.services.setting.currentSettings()),names:app.vault.getFiles().map(f=>f.path).sort()});})()",
+        "(async()=>{const core=app.plugins.plugins['livesync-efficient'].core;return JSON.stringify({sequence:(await core.localDatabase.localDatabase.info()).update_seq,settings:JSON.stringify(core.services.setting.currentSettings()),names:app.vault.getFiles().map(f=>f.path).sort()});})()",
         session.cliEnv
     );
 }
@@ -175,7 +175,7 @@ async function installDiagnosticExportInterception(page: Page): Promise<void> {
 async function restoreDiagnosticReadGate(cli: string, session: ObsidianLiveSyncSession): Promise<void> {
     await evalObsidianJson(
         cli,
-        `(async()=>{const gate=globalThis.databaseDiagnosticReadGate;if(gate){gate.release();if(gate.reached&&gate.drainPromise)await gate.drainPromise;const db=app.plugins.plugins['obsidian-livesync'].core.localDatabase.localDatabase;db.get=gate.originalGet;delete globalThis.databaseDiagnosticReadGate;}return JSON.stringify(true);})()`,
+        `(async()=>{const gate=globalThis.databaseDiagnosticReadGate;if(gate){gate.release();if(gate.reached&&gate.drainPromise)await gate.drainPromise;const db=app.plugins.plugins['livesync-efficient'].core.localDatabase.localDatabase;db.get=gate.originalGet;delete globalThis.databaseDiagnosticReadGate;}return JSON.stringify(true);})()`,
         session.cliEnv
     );
 }
@@ -189,7 +189,7 @@ async function installDiagnosticReadGate(
     const condition = readKind === "metadata" ? "options?.conflicts" : "options?.rev";
     await evalObsidianJson(
         cli,
-        `(async()=>{const db=app.plugins.plugins['obsidian-livesync'].core.localDatabase.localDatabase;const gate={reached:false,release:null,releasePromise:null,drain:null,drainPromise:null,originalGet:db.get};gate.releasePromise=new Promise(resolve=>{gate.release=resolve;});gate.drainPromise=new Promise(resolve=>{gate.drain=resolve;});globalThis.databaseDiagnosticReadGate=gate;db.get=async function(id,options){if(id===${JSON.stringify(documentId)}&&${condition}&&!gate.reached){gate.reached=true;try{await gate.releasePromise;return await gate.originalGet.call(this,id,options);}finally{gate.drain();}}return await gate.originalGet.call(this,id,options);};return JSON.stringify(true);})()`,
+        `(async()=>{const db=app.plugins.plugins['livesync-efficient'].core.localDatabase.localDatabase;const gate={reached:false,release:null,releasePromise:null,drain:null,drainPromise:null,originalGet:db.get};gate.releasePromise=new Promise(resolve=>{gate.release=resolve;});gate.drainPromise=new Promise(resolve=>{gate.drain=resolve;});globalThis.databaseDiagnosticReadGate=gate;db.get=async function(id,options){if(id===${JSON.stringify(documentId)}&&${condition}&&!gate.reached){gate.reached=true;try{await gate.releasePromise;return await gate.originalGet.call(this,id,options);}finally{gate.drain();}}return await gate.originalGet.call(this,id,options);};return JSON.stringify(true);})()`,
         session.cliEnv
     );
 }
@@ -350,7 +350,7 @@ async function assertDiagnosticFileLookup(
 
 async function assertFollowUpStopsAfterClose(page: Page, hatch: Locator, token: string): Promise<void> {
     await page.evaluate(`(() => {
-        const core = app.plugins.plugins['obsidian-livesync'].core;
+        const core = app.plugins.plugins['livesync-efficient'].core;
         const db = core.localDatabase.localDatabase;
         const manager = core.services.UI.dialogManager;
         const gate = {
@@ -421,7 +421,7 @@ async function assertFollowUpStopsAfterClose(page: Page, hatch: Locator, token: 
     } finally {
         await page.evaluate(`(() => {
             const gate = globalThis.diagnosticFollowUpCloseGate;
-            const core = app.plugins.plugins['obsidian-livesync'].core;
+            const core = app.plugins.plugins['livesync-efficient'].core;
             gate.release();
             core.localDatabase.localDatabase.get = gate.originalGet;
             core.localDatabase.allDocsRaw = gate.originalAllDocsRaw;
@@ -476,7 +476,7 @@ async function main(): Promise<void> {
         await waitForLocalDatabaseEntry(cli, session.cliEnv, fixturePath);
         const rawFixture = await evalObsidianJson<{ id: string; revision: string; shadowRevision: string }>(
             cli,
-            `(async()=>{const core=app.plugins.plugins['obsidian-livesync'].core;await core.services.fileProcessing.commitPendingFileEvents();const db=core.localDatabase.localDatabase;const id=await core.services.path.path2id(${JSON.stringify(fixturePath)});const original=await db.get(id);const shadow={...original,_id:${JSON.stringify(shadowId)}};delete shadow._rev;const stored=await db.put(shadow);return JSON.stringify({id,revision:original._rev,shadowRevision:stored.rev});})()`,
+            `(async()=>{const core=app.plugins.plugins['livesync-efficient'].core;await core.services.fileProcessing.commitPendingFileEvents();const db=core.localDatabase.localDatabase;const id=await core.services.path.path2id(${JSON.stringify(fixturePath)});const original=await db.get(id);const shadow={...original,_id:${JSON.stringify(shadowId)}};delete shadow._rev;const stored=await db.put(shadow);return JSON.stringify({id,revision:original._rev,shadowRevision:stored.rev});})()`,
             session.cliEnv
         );
         const before = await readDatabaseState(cli, session);
@@ -732,7 +732,7 @@ async function main(): Promise<void> {
         });
         const cancellationOrder = await evalObsidianJson<{ fixtureId: string; orderedIds: string[] }>(
             cli,
-            `(async()=>{const core=app.plugins.plugins['obsidian-livesync'].core;const db=core.localDatabase.localDatabase;return JSON.stringify({fixtureId:await core.services.path.path2id(${JSON.stringify(fixturePath)}),orderedIds:(await db.allDocs({include_docs:false})).rows.map(row=>row.id)});})()`,
+            `(async()=>{const core=app.plugins.plugins['livesync-efficient'].core;const db=core.localDatabase.localDatabase;return JSON.stringify({fixtureId:await core.services.path.path2id(${JSON.stringify(fixturePath)}),orderedIds:(await db.allDocs({include_docs:false})).rows.map(row=>row.id)});})()`,
             session.cliEnv
         );
         const fixturePosition = cancellationOrder.orderedIds.indexOf(cancellationOrder.fixtureId);

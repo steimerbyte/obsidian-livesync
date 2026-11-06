@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveSyncBubbleState, type SyncBubbleSnapshot } from "./syncStatusBubbleModel.ts";
+import {
+    deriveSyncBubbleCategories,
+    deriveSyncBubbleState,
+    type SyncBubbleCategoryTone,
+    type SyncBubbleSnapshot,
+} from "./syncStatusBubbleModel.ts";
 
 function snapshot(overrides: Partial<SyncBubbleSnapshot> = {}): SyncBubbleSnapshot {
     return {
@@ -12,6 +17,10 @@ function snapshot(overrides: Partial<SyncBubbleSnapshot> = {}): SyncBubbleSnapsh
         lastSyncPushSeq: 0,
         ...overrides,
     };
+}
+
+function categoryTones(input: SyncBubbleSnapshot): Record<string, SyncBubbleCategoryTone> {
+    return Object.fromEntries(deriveSyncBubbleCategories(input).map((category) => [category.key, category.tone]));
 }
 
 describe("deriveSyncBubbleState", () => {
@@ -42,9 +51,7 @@ describe("deriveSyncBubbleState", () => {
     });
 
     it("reports an active customization sync", () => {
-        const state = deriveSyncBubbleState(
-            snapshot({ configActive: true, statusText: "Scanning customizations..." })
-        );
+        const state = deriveSyncBubbleState(snapshot({ configActive: true, statusText: "Scanning customizations..." }));
 
         expect(state.tone).toBe("config");
         expect(state.headline).toBe("Synchronising settings");
@@ -109,5 +116,85 @@ describe("deriveSyncBubbleState", () => {
         const state = deriveSyncBubbleState(snapshot({ syncStatus: "ERRORED", configActive: true }));
 
         expect(state.tone).toBe("error");
+    });
+});
+
+describe("deriveSyncBubbleCategories", () => {
+    it("reports every category green once LiveSync is idle and ready", () => {
+        const categories = deriveSyncBubbleCategories(snapshot({ syncStatus: "COMPLETED" }));
+
+        expect(categories.map((category) => category.key)).toEqual([
+            "initialisation",
+            "replication",
+            "sync",
+            "config",
+            "storage",
+            "warnings",
+        ]);
+        expect(categories.map((category) => category.label)).toEqual([
+            "Initialisation",
+            "Replication",
+            "Sync",
+            "Config sync",
+            "Storage",
+            "Warnings",
+        ]);
+        expect(categories.every((category) => category.tone === "ok")).toBe(true);
+    });
+
+    it("warns about initialisation and sync while the app is starting", () => {
+        const tones = categoryTones(snapshot({ ready: false, syncStatus: "STARTED" }));
+
+        expect(tones.initialisation).toBe("warn");
+        expect(tones.sync).toBe("warn");
+        expect(tones.replication).toBe("warn");
+    });
+
+    it("warns while replication is running or paused", () => {
+        expect(categoryTones(snapshot({ syncStatus: "JOURNAL_SEND" })).replication).toBe("warn");
+        expect(categoryTones(snapshot({ syncStatus: "CONNECTED" })).replication).toBe("warn");
+        expect(categoryTones(snapshot({ syncStatus: "PAUSED" })).replication).toBe("warn");
+    });
+
+    it("warns while configuration sync is active", () => {
+        const tones = categoryTones(snapshot({ configActive: true }));
+
+        expect(tones.config).toBe("warn");
+        expect(tones.sync).toBe("warn");
+    });
+
+    it("keeps the sync row out of green while offline, paused, or replicating", () => {
+        expect(categoryTones(snapshot({ syncStatus: "NOT_CONNECTED" })).sync).toBe("warn");
+        expect(categoryTones(snapshot({ syncStatus: "PAUSED" })).sync).toBe("warn");
+        expect(categoryTones(snapshot({ syncStatus: "JOURNAL_SEND" })).sync).toBe("warn");
+        expect(categoryTones(snapshot({ syncStatus: "COMPLETED" })).sync).toBe("ok");
+        expect(categoryTones(snapshot({ syncStatus: "ERRORED" })).sync).toBe("error");
+    });
+
+    it("reports replication and sync errors", () => {
+        const tones = categoryTones(snapshot({ syncStatus: "ERRORED" }));
+
+        expect(tones.replication).toBe("error");
+        expect(tones.sync).toBe("error");
+        expect(tones.initialisation).toBe("ok");
+        expect(tones.storage).toBe("ok");
+    });
+
+    it("reports warnings as errors", () => {
+        expect(categoryTones(snapshot({ warningText: "⚠️ Network unreachable" })).warnings).toBe("error");
+        expect(categoryTones(snapshot({ warningText: "   " })).warnings).toBe("ok");
+        expect(categoryTones(snapshot({ warningText: undefined })).warnings).toBe("ok");
+    });
+
+    it("warns while storage, database, or chunk queues hold work", () => {
+        expect(categoryTones(snapshot({ storageQueues: { storage: 2 } })).storage).toBe("warn");
+        expect(categoryTones(snapshot({ storageQueues: { database: 1 } })).storage).toBe("warn");
+        expect(categoryTones(snapshot({ storageQueues: { chunk: 1 } })).storage).toBe("warn");
+    });
+
+    it("keeps storage green when every queue is empty", () => {
+        const tones = categoryTones(snapshot({ storageQueues: { storage: 0, database: 0, chunk: 0 } }));
+
+        expect(tones.storage).toBe("ok");
     });
 });

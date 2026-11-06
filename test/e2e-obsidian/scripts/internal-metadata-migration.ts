@@ -74,7 +74,7 @@ async function main(): Promise<void> {
         if (!session) throw new Error("No active Obsidian session.");
         return await evalObsidianJson<T>(
             cliBinary,
-            `(async()=>{const core=app.plugins.plugins['obsidian-livesync'].core;${body}})()`,
+            `(async()=>{const core=app.plugins.plugins['livesync-efficient'].core;${body}})()`,
             session.cliEnv
         );
     };

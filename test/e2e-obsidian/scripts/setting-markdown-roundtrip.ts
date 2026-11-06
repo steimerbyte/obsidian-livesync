@@ -61,14 +61,14 @@ const protectedConnectionKeys = [
 async function readCurrentSettings(cliBinary: string, session: ObsidianLiveSyncSession) {
     return await evalObsidianJson<ObsidianLiveSyncSettings>(
         cliBinary,
-        "JSON.stringify(app.plugins.plugins['obsidian-livesync'].core.services.setting.currentSettings())",
+        "JSON.stringify(app.plugins.plugins['livesync-efficient'].core.services.setting.currentSettings())",
         session.cliEnv
     );
 }
 
 async function readPersistedSettings(vaultPath: string): Promise<Record<string, unknown>> {
     return JSON.parse(
-        await readFile(join(vaultPath, ".obsidian", "plugins", "obsidian-livesync", "data.json"), "utf8")
+        await readFile(join(vaultPath, ".obsidian", "plugins", "livesync-efficient", "data.json"), "utf8")
     );
 }
 
@@ -190,7 +190,7 @@ async function importThroughUI(
             `const file=app.vault.getAbstractFileByPath(${JSON.stringify(settingPath)});`,
             "if(!file) throw new Error('The copied Markdown file is unavailable');",
             "await app.workspace.getLeaf(false).openFile(file,{state:{mode:'source'}});",
-            "return JSON.stringify(app.commands.executeCommandById('obsidian-livesync:livesync-import-config'));",
+            "return JSON.stringify(app.commands.executeCommandById('livesync-efficient:livesync-import-config'));",
             "})()",
         ].join(""),
         session.cliEnv
@@ -289,9 +289,9 @@ async function main() {
             };
             const exported = await evalObsidianJson<boolean>(
                 cli.binary,
-                "(async()=>{const core=app.plugins.plugins['obsidian-livesync'].core;" +
+                "(async()=>{const core=app.plugins.plugins['livesync-efficient'].core;" +
                     `await core.services.setting.applyExternalSettings(${JSON.stringify(configured)},false);` +
-                    "return JSON.stringify(app.commands.executeCommandById('obsidian-livesync:livesync-export-config'));})()",
+                    "return JSON.stringify(app.commands.executeCommandById('livesync-efficient:livesync-export-config'));})()",
                 session.cliEnv
             );
             assertEqual(exported, true, "The real Markdown export command was unavailable.");

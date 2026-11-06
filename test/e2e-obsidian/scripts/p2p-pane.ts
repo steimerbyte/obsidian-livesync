@@ -72,14 +72,14 @@ type ObsidianTestGlobal = typeof globalThis & { app?: ObsidianTestApp };
 async function openP2PStatusPane(page: Page) {
     return await page.evaluate((commandId) => {
         const app = (globalThis as ObsidianTestGlobal).app;
-        const plugin = app?.plugins?.plugins?.["obsidian-livesync"];
+        const plugin = app?.plugins?.plugins?.["livesync-efficient"];
         return {
             opened: app?.commands?.executeCommandById(commandId) === true,
             appIsMobile: app?.isMobile ?? null,
             apiIsMobile: plugin?.core?.services?.API?.isMobile?.() ?? null,
             bodyIsMobile: document.body.classList.contains("is-mobile"),
         };
-    }, "obsidian-livesync:open-p2p-server-status");
+    }, "livesync-efficient:open-p2p-server-status");
 }
 
 async function collectP2PWorkspaceState(page: Page) {
@@ -164,9 +164,7 @@ async function verifyP2PStatusPane(filename: string, mobile: boolean): Promise<s
             await heading.waitFor({ state: "visible", timeout: uiTimeoutMs });
         } catch (error) {
             const workspaceState = await collectP2PWorkspaceState(page);
-            console.error(
-                `P2P command state after failed open: ${JSON.stringify({ dispatchState, runtimeErrors })}`
-            );
+            console.error(`P2P command state after failed open: ${JSON.stringify({ dispatchState, runtimeErrors })}`);
             console.error(`P2P workspace state after failed open: ${JSON.stringify(workspaceState)}`);
             throw error;
         } finally {
@@ -197,8 +195,9 @@ async function verifyP2PStatusPane(filename: string, mobile: boolean): Promise<s
             throw new Error("The configured P2P status pane did not select an active P2P remote.");
         }
         if (
-            (await pane.getByText("Please select an active P2P remote configuration to change P2P sync targets.").count()) !==
-            0
+            (await pane
+                .getByText("Please select an active P2P remote configuration to change P2P sync targets.")
+                .count()) !== 0
         ) {
             throw new Error("The configured P2P status pane still requested an active P2P remote.");
         }
@@ -215,8 +214,8 @@ async function assertP2PUIIsOptIn(): Promise<void> {
         const state = await page.evaluate(() => {
             const commands = (globalThis as ObsidianTestGlobal).app?.commands?.commands ?? {};
             return {
-                currentCommand: commands["obsidian-livesync:open-p2p-server-status"] !== undefined,
-                legacyCommand: commands["obsidian-livesync:open-p2p-replicator"] !== undefined,
+                currentCommand: commands["livesync-efficient:open-p2p-server-status"] !== undefined,
+                legacyCommand: commands["livesync-efficient:open-p2p-replicator"] !== undefined,
             };
         });
         if (!state.currentCommand) {
@@ -252,7 +251,7 @@ async function assertConfiguredP2PCommandIsAvailable(): Promise<void> {
             const app = (globalThis as ObsidianTestGlobal).app;
             const commands = app?.commands?.commands ?? {};
             return {
-                commandRegistered: commands["obsidian-livesync:open-p2p-server-status"] !== undefined,
+                commandRegistered: commands["livesync-efficient:open-p2p-server-status"] !== undefined,
                 openPaneCount: app?.workspace?.getLeavesOfType?.("p2p-server-status").length ?? 0,
             };
         });
@@ -351,11 +350,7 @@ async function withP2PSession(
             lifecycle: options.mobileBeforePluginStart
                 ? {
                       beforePluginStart: async ({ remoteDebuggingPort }) => {
-                          await setObsidianMobileTestModeBeforePluginStart(
-                              remoteDebuggingPort,
-                              true,
-                              uiTimeoutMs
-                          );
+                          await setObsidianMobileTestModeBeforePluginStart(remoteDebuggingPort, true, uiTimeoutMs);
                       },
                   }
                 : undefined,
@@ -381,18 +376,13 @@ async function main(): Promise<void> {
         await assertP2PUIIsOptIn();
     });
 
-    await withP2PSession(
-        binary,
-        cli.binary,
-        createConfiguredP2PPluginData(),
-        async () => {
-            await assertConfiguredP2PUIIsAvailable();
-            const desktopScreenshot = await verifyP2PStatusPane("p2p-status-pane.png", false);
-            console.log(
-                `Configured P2P status UI remained opt-in and was reachable on desktop. Screenshot: ${desktopScreenshot}`
-            );
-        }
-    );
+    await withP2PSession(binary, cli.binary, createConfiguredP2PPluginData(), async () => {
+        await assertConfiguredP2PUIIsAvailable();
+        const desktopScreenshot = await verifyP2PStatusPane("p2p-status-pane.png", false);
+        console.log(
+            `Configured P2P status UI remained opt-in and was reachable on desktop. Screenshot: ${desktopScreenshot}`
+        );
+    });
 
     await withP2PSession(
         binary,

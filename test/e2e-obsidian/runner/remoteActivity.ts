@@ -23,18 +23,17 @@ export type RemoteActivityGateKind = (typeof REMOTE_ACTIVITY_GATE_KIND)[keyof ty
 
 export type RemoteActivitySnapshot = {
     boundedRemoteActivityCount: number;
+    bubbleFound: boolean;
     finiteReplicationActivityCount: number;
     gateDone?: boolean;
     gateEntered?: boolean;
     gateError?: string;
     gateKind?: RemoteActivityGateKind;
+    liveStatusText: string;
     requestCount: number;
     remoteOperationIndicatorVisible: boolean;
     remoteRequestIndicatorVisible: boolean;
     responseCount: number;
-    statusBarFound: boolean;
-    statusBarText: string;
-    indicatorElements?: Array<{ text: string; inactive: boolean; ariaHidden: string | null; display: string }>;
 };
 
 export type ExpectedRemoteActivityState =
@@ -77,9 +76,13 @@ async function readRemoteActivitySnapshotFromPage(page: Page): Promise<RemoteAct
             const core = globals.app?.plugins?.plugins?.[pluginId]?.core;
             if (!core) throw new Error(`Obsidian plug-in is not loaded: ${pluginId}`);
             const gate = (globalThis as unknown as Record<string, RuntimeGate | undefined>)[stateKey];
-            const statusBars = Array.from(document.querySelectorAll<HTMLElement>(".syncstatusbar"));
+            const bubble = document.querySelector<HTMLElement>(".livesync-bubble");
+            const orb = bubble?.querySelector<HTMLElement>(".lsb-orb");
+            if (bubble && orb && !bubble.classList.contains("is-open")) orb.click();
+            const liveStatusText = bubble?.querySelector<HTMLElement>(".lsb-live-status")?.textContent ?? "";
             return {
                 boundedRemoteActivityCount: Number(core.services?.replicator?.boundedRemoteActivityCount?.value ?? -1),
+                bubbleFound: bubble !== null,
                 finiteReplicationActivityCount: Number(
                     core.services?.replicator?.finiteReplicationActivityCount?.value ?? -1
                 ),
@@ -87,33 +90,16 @@ async function readRemoteActivitySnapshotFromPage(page: Page): Promise<RemoteAct
                 gateEntered: gate?.entered,
                 gateError: gate?.error,
                 gateKind: gate?.kind,
+                liveStatusText,
                 requestCount: Number(core.services?.API?.requestCount?.value ?? -1),
-                remoteOperationIndicatorVisible: statusBars.some((element) =>
-                    element.innerText.includes(operationIcon)
-                ),
-                remoteRequestIndicatorVisible: statusBars.some((element) => element.innerText.includes(requestIcon)),
+                remoteOperationIndicatorVisible: liveStatusText.includes(operationIcon),
+                remoteRequestIndicatorVisible: liveStatusText.includes(requestIcon),
                 responseCount: Number(core.services?.API?.responseCount?.value ?? -1),
-                statusBarFound: statusBars.length > 0,
-                statusBarText: statusBars.map((element) => element.innerText).join("\n"),
-                indicatorElements: Array.from(
-                    document.querySelectorAll<HTMLElement>(".syncstatusbar .livesync-stat-item")
-                )
-                    .filter(
-                        (element) =>
-                            (element.textContent ?? "").includes(operationIcon) ||
-                            (element.textContent ?? "").includes(requestIcon)
-                    )
-                    .map((element) => ({
-                        text: element.textContent ?? "",
-                        inactive: element.classList.contains("livesync-stat-inactive"),
-                        ariaHidden: element.getAttribute("aria-hidden"),
-                        display: getComputedStyle(element).display,
-                    })),
             } satisfies RemoteActivitySnapshot;
         },
         {
             operationIcon: REMOTE_OPERATION_ACTIVITY_ICON,
-            pluginId: "obsidian-livesync",
+            pluginId: "livesync-efficient",
             requestIcon: REMOTE_REQUEST_ACTIVITY_ICON,
             stateKey: REMOTE_ACTIVITY_E2E_STATE_KEY,
         }
@@ -153,15 +139,16 @@ export async function waitForRemoteActivityState(
                     const core = globals.app?.plugins?.plugins?.[pluginId]?.core;
                     if (!core) return false;
                     const gate = (globalThis as unknown as Record<string, RuntimeGate | undefined>)[stateKey];
-                    const statusBarText = Array.from(document.querySelectorAll<HTMLElement>(".syncstatusbar"))
-                        .map((element) => element.innerText)
-                        .join("\n");
+                    const bubble = document.querySelector<HTMLElement>(".livesync-bubble");
+                    const orb = bubble?.querySelector<HTMLElement>(".lsb-orb");
+                    if (bubble && orb && !bubble.classList.contains("is-open")) orb.click();
+                    const liveStatusText = bubble?.querySelector<HTMLElement>(".lsb-live-status")?.textContent ?? "";
                     const bounded = Number(core.services?.replicator?.boundedRemoteActivityCount?.value ?? -1);
                     const finite = Number(core.services?.replicator?.finiteReplicationActivityCount?.value ?? -1);
                     const requests = Number(core.services?.API?.requestCount?.value ?? -1);
                     const responses = Number(core.services?.API?.responseCount?.value ?? -1);
-                    const operationIconVisible = statusBarText.includes(operationIcon);
-                    const requestIconVisible = statusBarText.includes(requestIcon);
+                    const operationIconVisible = liveStatusText.includes(operationIcon);
+                    const requestIconVisible = liveStatusText.includes(requestIcon);
                     const trackedRequests = Math.max(0, requests - responses);
 
                     if (expectedState === expectedStates.finiteReplicationActive) {
@@ -194,7 +181,7 @@ export async function waitForRemoteActivityState(
                             finite === 0 &&
                             trackedRequests > 0 &&
                             !operationIconVisible &&
-                            statusBarText.includes(`${requestIcon}${trackedRequests}`)
+                            liveStatusText.includes(`${requestIcon}${trackedRequests}`)
                         );
                     }
                     return (
@@ -210,7 +197,7 @@ export async function waitForRemoteActivityState(
                     expectedStates: REMOTE_ACTIVITY_EXPECTED_STATE,
                     gateKinds: REMOTE_ACTIVITY_GATE_KIND,
                     operationIcon: REMOTE_OPERATION_ACTIVITY_ICON,
-                    pluginId: "obsidian-livesync",
+                    pluginId: "livesync-efficient",
                     requestIcon: REMOTE_REQUEST_ACTIVITY_ICON,
                     stateKey: REMOTE_ACTIVITY_E2E_STATE_KEY,
                 },
