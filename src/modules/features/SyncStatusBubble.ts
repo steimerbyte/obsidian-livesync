@@ -274,9 +274,11 @@ export class SyncStatusBubble {
         if (!rect || rect.width <= 0) return;
         const margin = Platform.isMobile ? 12 : 52;
         const top = Platform.isMobile ? Math.max(60, rect.top + 12) : Math.max(12, rect.top + 12);
-        this.root.style.left = `${Math.max(8, Math.round(rect.right - this.root.offsetWidth - margin))}px`;
-        this.root.style.top = `${Math.round(top)}px`;
-        this.root.style.right = "auto";
+        this.root.setCssProps({
+            left: `${Math.max(8, Math.round(rect.right - this.root.offsetWidth - margin))}px`,
+            top: `${Math.round(top)}px`,
+            right: "auto",
+        });
     }
 
     private refresh(): void {

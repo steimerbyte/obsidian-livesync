@@ -12,6 +12,40 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+## 1.0.53
+
+9th November, 2026
+
+### Fixed
+
+#### Synchronisation and recovery
+
+- Receiving devices no longer reject newly saved files with 'seems to be corrupted! Writing prevented' because rapid edits left the sender's cached file size out of date. New saves record the byte length of the content actually read. (#1324)
+    - Existing incorrect size records need explicit repair. Use **Inspect conflicts and file/database differences** → **Correct recorded file size** when the readable current database revision has no conflicts and matches the Vault exactly. The correction retains the file content and timestamps.
+
+#### CLI
+
+- The CLI daemon now starts even when hidden directories in the Vault are unreadable. Vault scans skip these directories, which remain excluded from synchronisation. (#1325)
+- The daemon now detects files written into newly created folders during a burst of writes, including files renamed from temporary names, without requiring a restart. (#1328)
+    - The CLI requires Node.js 22.22 or later. The Docker image includes its own runtime.
+
+### Improved
+
+#### P2P synchronisation
+
+- We can inspect the latest relay, peer, and synchronisation observations in **P2P Status**. Expand **Diagnostic summary** below **Stats**; detailed observations start collapsed.
+    - Enable **Diag** to show diagnostic events in the Log Pane without status-bubble updates or notifications. Opening the Log Pane also displays its buffered messages.
+    - Unobserved information is labelled explicitly. An open room does not establish relay acceptance; relay rejection details remain unavailable through the diagnostic summary.
+- We can see sent (↑) and received (↓) database document revision counts in the P2P panes and status bubble. Counts include Metadata and Chunks, rather than Vault files.
+    - Directional ⏩ labels show changes-feed comparison progress, including when no revisions need transferring. Each label disappears three seconds after its count last changes; its absence alone does not establish completion. Peers without document statistics retain sequence values labelled `seq`.
+- Peer actions and long device names now fit narrow panes. Larger buttons and wrapped labels keep the controls readable and usable.
+- The updated transport incorporates upstream improvements to peer discovery after relay reconnection, missed signalling messages, and stale connections after rejoining or waiting. Connection offers are created on demand.
+    - All communicating devices in our P2P group, including CLI and WebPeer clients, must be updated together before P2P synchronisation resumes. Trystero 0.26.0 cannot exchange data with the previous transport.
+
+### Documentation
+
+- Clarified backend selection and hosting requirements, including Object Storage request costs. Added a guide to P2P diagnostic observations, logs, and transfer progress.
+
 ## 1.0.52
 
 6th November, 2026
@@ -123,7 +157,6 @@ This is a fork release of Self-hosted LiveSync, maintained by steimerbyte. It fo
 
 - The plug-in bundle is smaller.
     - Compression runs two passes instead of one, which reduces `main.js` by 68,574 B (1.68 %). The status bar no longer paints a blurred backdrop, a greyscale filter, or a repeating animation.
-
 ## 1.0.45
 
 5th November, 2026
