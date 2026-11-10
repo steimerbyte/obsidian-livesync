@@ -12,6 +12,23 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+### Fixed
+
+#### Synchronisation and recovery
+
+- A temporary read failure no longer leaves synchronisation blocked until Obsidian restarts. (#1331)
+    - A related file change or **Apply pending changes now** retries the failed operation against the current Vault contents.
+
+- Fetching into a Vault that already holds the fetched files no longer fails repeatedly against CouchDB. (#1329, #1332)
+    - With **Fetch chunks on demand** enabled, missing Chunks are retrieved when needed. The same fix applies when Fast Setup falls back to Standard Fetch.
+    - **Use Only Local Chunks** remains respected. Unavailable content keeps Fetch incomplete for retry.
+
+### CLI
+
+- A repeated CouchDB Fetch into an existing Vault now completes instead of failing again. (#1329)
+    - Content checks retrieve missing Chunks where **Fetch chunks on demand** is enabled, and **Use Only Local Chunks** remains respected.
+    - Incomplete Fetch operations retain their recovery state.
+
 ## 1.0.53
 
 9th November, 2026
