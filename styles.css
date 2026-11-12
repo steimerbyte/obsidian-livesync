@@ -117,8 +117,28 @@
     max-width: max-content;
 }
 
+.sls-troubleshoot-preview .sls-troubleshoot-sticky {
+    position: sticky;
+    top: -1em;
+    background-color: var(--modal-background);
+}
+
+.sls-troubleshoot-heading-target {
+    scroll-margin: 3em;
+}
+
+.sls-troubleshoot-preview.sls-troubleshoot-scroll-target {
+    scroll-margin: 1em;
+}
+
 .sls-troubleshoot-preview img {
     max-width: 100%;
+}
+
+.modal .modal-content.sls-config-sync-modal-content {
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 .sls-setting-tab {
@@ -457,6 +477,11 @@ span.ls-mark-cr::after {
 .livesync-bubble.is-mobile {
     top: calc(env(safe-area-inset-top, 0px) + 60px);
     right: calc(env(safe-area-inset-right, 0px) + 12px);
+}
+
+/* Inline left/top take over from the fixed right offset once positioned. */
+.livesync-bubble.is-positioned {
+    right: auto;
 }
 
 .livesync-bubble.is-mobile .lsb-close {
@@ -1089,6 +1114,35 @@ body.is-mobile .sls-setting .sls-setting-additional-action {
     display: flex;
     justify-content: flex-end;
     align-items: center;
+}
+
+.sls-dialogue-note-wrapper.sls-hidden {
+    display: none;
+}
+
+.livesync-message-box-container .modal-content .sls-message-box-markdown {
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+.livesync-message-box-container .setting-item-info.sls-hidden {
+    display: none;
+}
+
+.livesync-message-box-container .setting-item-control.sls-message-box-button-control {
+    flex-wrap: wrap;
+}
+
+.livesync-message-box-container .setting-item-control.sls-message-box-button-control-wide {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+}
+
+.livesync-message-box-container .setting-item-control .sls-message-box-wide-button {
+    flex-grow: 1;
+    width: 100%;
 }
 
 .sls-dialogue-note-countdown {
