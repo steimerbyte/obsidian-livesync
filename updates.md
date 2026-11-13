@@ -12,6 +12,35 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+## 1.0.57
+
+13th November, 2026
+
+### Improved
+
+#### Synchronisation
+
+- File-name collision checks no longer rebuild the whole path map after a content-only edit. (Upstream 1.0.50)
+    - The plug-in keeps file-name membership from Obsidian's Vault listing and file events.
+    - Actions that delete older revisions, such as resolving conflicts by the newer file, read a fresh listing first and abort before removing anything if that listing fails.
+
+### Fixed
+
+#### P2P synchronisation
+
+- Later P2P changes can reach following devices when an earlier change notification was ignored before the peer was accepted. (Upstream 1.0.50, #1247)
+    - Change notifications no longer wait for a reply from the receiving device. A missed final notification still requires a later change or explicit synchronisation.
+
+### CLI
+
+- CLI daemon collision checks no longer enumerate every file and its metadata after each content edit. (Upstream 1.0.50)
+- CLI Vaults whose root or parent directories have dot-prefixed names now synchronise, including through symlinks that resolve to those locations. Startup scans and live monitoring apply the same exclusions within the Vault. (Upstream 1.0.50, #1340)
+- `--include-db-like-dirs` includes ordinary directories with database-like names on each invocation. Database storage entries, hidden entries, and user ignore rules remain excluded. (Upstream 1.0.50)
+
+### Miscellaneous
+
+- Updated dependencies, including Commonlib 0.5.0.
+
 ## 1.0.56
 
 12th November, 2026

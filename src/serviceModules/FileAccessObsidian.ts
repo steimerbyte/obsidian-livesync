@@ -88,4 +88,9 @@ export class FileAccessObsidian extends FileAccessBase<ObsidianFileSystemAdapter
         await this.assertReadable(file);
         return await super.vaultCacheRead(file);
     }
+
+    /** Releases the adapter's filesystem observations when the plug-in unloads. */
+    dispose(): void {
+        this.adapter.dispose();
+    }
 }
