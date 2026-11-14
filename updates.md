@@ -12,6 +12,18 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+## 1.0.58
+
+14th November, 2026
+
+### Miscellaneous
+
+- Adopted the upstream source layout reorganisation. (Upstream main, `73adfe3a`)
+    - Behaviour is unchanged. The moved files are byte-identical to their previous forms; only import paths and the source-layout guidance in `AGENTS.md`, `devs.md`, and the replicator architecture design document changed.
+    - Host-independent helpers now live under `src/common/core/`, feature-owned helpers sit with their owners, and connection checks moved to `src/modules/features/SetupWizard/connection/`.
+    - The fork's own divergences were carried over: the status bubble keeps importing the relocated settings dialogue helper, and the CLI periodic-sweep test mocks the relocated community plug-in helper.
+    - No action is required for users.
+
 ## 1.0.57
 
 13th November, 2026
