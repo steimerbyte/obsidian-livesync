@@ -29,7 +29,7 @@ import { usePrepareDatabaseForUse } from "@vrtmrz/livesync-commonlib/compat/serv
 import { useStartupProgressFeature } from "./serviceFeatures/startupProgress";
 import type { Constructor } from "@vrtmrz/livesync-commonlib/compat/common/utils.type";
 import { useReplicationScheduling, type ReplicationSchedulingControl } from "./serviceFeatures/replicationScheduling";
-import { createCentralReplicatorProviderDefinitions } from "./common/replicatorProviders";
+import { createCentralReplicatorProviderDefinitions } from "./common/core/replication/providers";
 import { useReplicationFeature } from "./serviceFeatures/replication";
 import { useConflictResolutionFeature } from "./serviceFeatures/conflictResolution";
 import { createInstanceLogFunction } from "@vrtmrz/livesync-commonlib/compat/services/lib/logUtils";

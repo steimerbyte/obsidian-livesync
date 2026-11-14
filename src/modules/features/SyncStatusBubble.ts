@@ -1,5 +1,5 @@
 import { Platform, setIcon, type App } from "@/deps.ts";
-import { openObsidianSettings } from "@/common/obsidianSettings.ts";
+import { openObsidianSettings } from "@/modules/coreObsidian/UI/obsidianSettings.ts";
 import { startupProgress } from "@/common/startupProgress.ts";
 import { requestUserInitiatedReplication } from "@/serviceFeatures/manualReplication.ts";
 import type { LiveSyncCore } from "@/main.ts";

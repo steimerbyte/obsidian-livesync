@@ -33,7 +33,7 @@ vi.mock("@/common/events.ts", () => ({
     eventHub: { onEvent: vi.fn(), onceEvent: vi.fn() },
 }));
 vi.mock("@/common/translation", () => ({ $msg: (message: string) => message }));
-vi.mock("@/common/obsidianCommunityPlugins.ts", () => ({ getObsidianCommunityPluginManager: vi.fn() }));
+vi.mock("@/features/HiddenFileCommon/obsidianCommunityPlugins.ts", () => ({ getObsidianCommunityPluginManager: vi.fn() }));
 
 import { DEFAULT_SETTINGS } from "@vrtmrz/livesync-commonlib/compat/common/types";
 import { ConfigSync } from "./CmdConfigSync";

@@ -64,12 +64,12 @@ import {
 import { MARK_LOG_NETWORK_ERROR, type LogFunction } from "@vrtmrz/livesync-commonlib/compat/services/lib/logUtils";
 import { NetworkWarningStyles } from "@vrtmrz/livesync-commonlib/compat/common/models/setting.const";
 import { compatGlobal } from "@vrtmrz/livesync-commonlib/compat/common/coreEnvFunctions";
-import { generateReport } from "@/common/reportTool.ts";
+import { generateReport } from "./ModuleLog/diagnostics/reportTool.ts";
 import { observeStartupLog } from "@/common/startupProgress.ts";
 import {
     ANDROID_LINUX_PATH_COMPONENT_UTF8_WARNING_BOUNDARY,
     findPathComponentsExceedingUtf8Limit,
-} from "@/common/pathCompatibility.ts";
+} from "./ModuleLog/diagnostics/pathCompatibility.ts";
 
 type NoticeCapableAPI = { showNotice?: (message: string, duration?: number) => void };
 
