@@ -1,9 +1,10 @@
 import { discoverObsidianCli, requireObsidianBinary } from "../runner/environment.ts";
 import { startObsidianLiveSyncSession, type ObsidianLiveSyncSession } from "../runner/session.ts";
-import { withObsidianPage } from "../runner/ui.ts";
+import { captureObsidianPage, withObsidianPage } from "../runner/ui.ts";
 import { createTemporaryVault } from "../runner/vault.ts";
 import type { Page } from "playwright";
 import { setObsidianMobileTestModeBeforePluginStart } from "../runner/mobileUi.ts";
+import type { P2PReplicationProgress } from "@vrtmrz/livesync-commonlib/compat/replication/trystero/TrysteroReplicator";
 
 const fixturePath = "replication-status-e2e.md";
 const uiTimeoutMs = Number(process.env.E2E_OBSIDIAN_UI_TIMEOUT_MS ?? 10000);
@@ -45,14 +46,17 @@ type TestWorkspace = {
 type TestLogModule = {
     statusLog?: WritableSource<string>;
     activeFileStatus?: WritableSource<string>;
-    p2pLogCollector?: { p2pReplicationLine: WritableSource<string> };
+    p2pLogCollector?: { p2pReplicationStats: WritableSource<readonly P2PReplicationProgress[]> };
     statusBarLabels?: WritableSource<{ parts: readonly StatusPart[]; message: string }>;
     __addLog?: (message: unknown, level?: number, key?: string) => void;
 };
 type TestCore = {
     modules?: unknown[];
     services?: {
-        setting?: { currentSettings?: () => Record<string, unknown> };
+        setting?: {
+            currentSettings?: () => Record<string, unknown>;
+            applyPartial?: (settings: Record<string, unknown>, saveImmediately: boolean) => Promise<void>;
+        };
         replicator?: {
             replicationStatics?: WritableSource<TestReplicationStatics>;
         };
@@ -457,7 +461,7 @@ async function assertLegacyStatusPaths(page: Page): Promise<void> {
             { key: "queue-conflicts", mark: "🔩", source: services.conflict.conflictProcessQueueCount, value: 8 },
         ];
         const warning = moduleLog.activeFileStatus;
-        const p2p = moduleLog.p2pLogCollector.p2pReplicationLine;
+        const p2p = moduleLog.p2pLogCollector.p2pReplicationStats;
         const labels = moduleLog.statusBarLabels;
         const previous = {
             counters: counters.map(({ source }) => source.value),
@@ -465,7 +469,7 @@ async function assertLegacyStatusPaths(page: Page): Promise<void> {
             p2p: p2p.value,
             hideFileWarningNotice: settings.hideFileWarningNotice,
         };
-        const peerLine = "⚡ E2E peer ↑ 11/12 ↓ 13/14";
+        const peerLine = "⚡ E2E peer ↑ seq 11 (12) ↓ seq 13 (14)";
         const liveText = () =>
             document.querySelector<HTMLElement>(".livesync-bubble .lsb-live-status")?.textContent ?? "";
         const wait = {
@@ -479,7 +483,14 @@ async function assertLegacyStatusPaths(page: Page): Promise<void> {
         };
         try {
             for (const { source, value } of counters) source.value = value;
-            p2p.value = peerLine;
+            p2p.value = [
+                {
+                    peerId: "e2e-status-peer",
+                    peerName: "E2E peer",
+                    sending: { current: 11, max: 12, isActive: true },
+                    fetching: { current: 13, max: 14, isActive: true },
+                },
+            ];
             settings.hideFileWarningNotice = false;
             warning.value = "E2E file warning";
             await wait.until(
@@ -503,7 +514,7 @@ async function assertLegacyStatusPaths(page: Page): Promise<void> {
                 () => liveText().includes("⛔ SKIP") && !liveText().includes("E2E file warning"),
                 "The file warning did not switch to its existing compact icon."
             );
-            p2p.value = "";
+            p2p.value = [];
             await wait.until(
                 () => labels.value.message.endsWith(" ⛔ SKIP"),
                 "The single-line status lost the compact file warning."
@@ -519,6 +530,7 @@ async function assertLegacyStatusPaths(page: Page): Promise<void> {
     }, uiTimeoutMs);
     console.log("Queue counts, P2P text, file warnings, and plain-text status remain available.");
 }
+
 
 async function runStatusScenario(session: ObsidianLiveSyncSession): Promise<void> {
     await withObsidianPage(session.remoteDebuggingPort, async (page) => {
@@ -671,7 +683,8 @@ async function main(): Promise<void> {
                 "The LiveSync plug-in did not become ready."
             );
             if (!mobile) await runStatusScenario(session);
-            await withObsidianPage(session.remoteDebuggingPort, async (page) => {
+            const statusPort = session.remoteDebuggingPort;
+            await withObsidianPage(statusPort, async (page) => {
                 await installFixtureFile(page);
                 try {
                     await page.locator(bubbleSelector).waitFor({ state: "attached", timeout: uiTimeoutMs });

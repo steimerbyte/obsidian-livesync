@@ -1,3 +1,4 @@
+import { useReflectionRecoveryReview } from "./serviceFeatures/replication/reflectionRecoveryReview";
 import { useP2PSettingsPreparation } from "@/serviceFeatures/useP2PSettingsPreparation";
 import { LOG_LEVEL_URGENT, LOG_LEVEL_VERBOSE } from "octagonal-wheels/common/logger";
 import { getLanguage, Notice, Platform, Plugin, type App, type PluginManifest } from "./deps";
@@ -65,6 +66,7 @@ import { SyncGuardOverlay } from "./serviceFeatures/syncGuard/SyncGuardOverlay";
 import { useStartupLifecycleFeature } from "./serviceFeatures/startupLifecycle";
 import { useJoinedDevicesFeature } from "./serviceFeatures/useJoinedDevices";
 import { useDatabaseDiagnosticsFeature } from "./serviceFeatures/useDatabaseDiagnostics";
+import { useDatabaseConnectionRecovery } from "./serviceFeatures/databaseConnectionRecovery";
 export type LiveSyncCore = LiveSyncBaseCore<ObsidianServiceContext, LiveSyncCommands>;
 
 type NoticeCapableAPI = { showNotice?: (message: string, duration?: number) => void };
@@ -117,6 +119,7 @@ export default class ObsidianLiveSyncPlugin extends Plugin {
             storageAccessManager: storageAccessManager,
             APIService: services.API,
         });
+        useDatabaseConnectionRecovery(core, storageEventManager, () => services.context.isHostActive());
         const storageAccess = new ServiceFileAccessObsidian({
             API: services.API,
             setting: services.setting,
@@ -213,7 +216,8 @@ export default class ObsidianLiveSyncPlugin extends Plugin {
                 const addOns = [new ConfigSync(core), new HiddenFileSync(core), new LocalDatabaseMaintenance(core)];
                 return addOns;
             },
-            (core) => {
+            (core, coreFeatureViews) => {
+                useReflectionRecoveryReview(core, coreFeatureViews.reflectionRecovery, serviceHub.context.noticeGroups);
                 //TODO Fix: useXXXX
                 const featuresInitialiser = enableI18nFeature;
                 const curriedFeature = () => featuresInitialiser(core);
@@ -258,7 +262,8 @@ export default class ObsidianLiveSyncPlugin extends Plugin {
                     waitForCompatibilityReview: () => compatibilityReview.openReview(),
                 });
                 useReviewHarness(core, this, compatibilityReview);
-            }
+            },
+            { recoverFileReflectionFailures: true }
         );
     }
 

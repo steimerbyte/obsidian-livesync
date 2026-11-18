@@ -31,6 +31,21 @@ LiveSync reports synchronisation status in the status bubble above the active no
 
 To prevent file and database corruption, please avoid closing Obsidian until all progress indicators have disappeared as much as possible (although the plug-in will attempt to resume if interrupted). This is especially important if you have deleted or renamed files.
 
+## Configured automatic synchronisation
+
+The live status line in the bubble shows the configured automatic synchronisation for a CouchDB or S3-compatible Object Storage remote, ahead of the transfer status:
+
+| Symbol | Configured triggers |
+| --- | --- |
+| 🔗 | LiveSync mode |
+| ⏰ | Periodic synchronisation |
+| ✨ | At least one event trigger: file save, editor save, start-up, file open, or file merge |
+| 🛎 | Manual synchronisation only; all ordinary automatic triggers are disabled |
+
+Enabled groups appear together: `⏰ ✨` means periodic and event synchronisation are configured. The badge describes the settings, while `Sync:` describes current transfer activity. A configured mode does not establish that the device is connected or that file and database reflection is enabled. Unconfigured Vaults and P2P main remotes do not show this badge; P2P uses its own connection and automatic synchronisation settings.
+
+Fetch and Rebuild deliberately disable automatic synchronisation. Completion does not restore the previous mode, so the badge then shows 🛎. A completed operation can still leave conflicts to review. Please review the resulting Vault and any conflicts before choosing the intended triggers under **Sync Settings** → **Synchronization Method**.
+
 ## CouchDB comparison count
 
 When CouchDB change history is being compared, directional counts can appear before any new documents arrive, for example `Sync: ⏩ (⏩↑ 1200) (⏩↓ 84) ↑ 0 ↓ 0`. The `⏩↑` count is for the push direction, and `⏩↓` is for the pull direction. Each counts candidate changes-feed entries compared during the current replication attempt, including entries which do not need to be transferred and repeated entries on retries. They are feed-entry counts, not counts of Vault files which need to be transferred. The final `↑` and `↓` counts continue to show uploaded and downloaded Chunks and Metadata.

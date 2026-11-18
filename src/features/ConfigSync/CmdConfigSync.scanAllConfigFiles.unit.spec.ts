@@ -66,7 +66,14 @@ vi.mock("@/features/HiddenFileCommon/obsidianCommunityPlugins.ts", () => ({
 
 vi.mock("octagonal-wheels/concurrency/scoped.iteration", { spy: true });
 
-import { LOG_LEVEL_VERBOSE, MODE_PAUSED, type FilePath } from "@vrtmrz/livesync-commonlib/compat/common/types";
+import {
+    LOG_LEVEL_VERBOSE,
+    MODE_AUTOMATIC,
+    MODE_PAUSED,
+    MODE_SELECTIVE,
+    MODE_SHINY,
+    type FilePath,
+} from "@vrtmrz/livesync-commonlib/compat/common/types";
 import * as iterationModule from "octagonal-wheels/concurrency/scoped.iteration";
 import { promiseWithResolvers } from "octagonal-wheels/promises";
 import { ConfigSync } from "./CmdConfigSync";
@@ -111,17 +118,13 @@ function setup(files: string[] = [], rows: Row[] = [], usePluginSyncV2 = true, p
         filenameWithUnifiedKey: (path: string, _term: string) => keyOf(path),
         unifiedKeyPrefixOfTerminal: (_term: string) => prefix,
         storeCustomisationFileV2,
+        storeCustomizationFiles,
         deleteConfigOnDatabase,
+        getPath: (entry: Row) => entry.path,
+        filenameToUnifiedKey: (path: string) => keyOf(path),
         updatePluginList,
         _log: log,
     });
-    if (!usePluginSyncV2) {
-        Object.assign(configSync, {
-            getPath: (entry: { path: string }) => entry.path,
-            storeCustomizationFiles,
-            filenameToUnifiedKey: (path: string) => keyOf(path),
-        });
-    }
     return {
         configSync,
         events,
@@ -137,6 +140,153 @@ function setup(files: string[] = [], rows: Row[] = [], usePluginSyncV2 = true, p
 
 beforeEach(() => {
     vi.clearAllMocks();
+});
+
+describe.each([false, true])("ConfigSync scan mode selection (V2: %s)", (useV2) => {
+    const workspace = ".obsidian/workspace.json";
+    const legacyWorkspace = `${prefix}CONFIG/workspace.json.md`;
+    const v2Workspace = `${prefix}CONFIG/workspace.json%workspace.json`;
+
+    function setupMode(mode?: number, localFiles = [workspace], registeredFiles = ["workspace.json"]) {
+        const rows: Row[] = [];
+        const fixture = setup(localFiles, rows);
+        Object.assign(fixture.configSync.core.settings, {
+            usePluginSyncV2: useV2,
+            pluginSyncExtendedSetting:
+                mode === undefined
+                    ? {}
+                    : { "CONFIG/workspace.json": { key: "CONFIG/workspace.json", mode, files: registeredFiles } },
+        });
+        Object.assign(fixture.configSync, {
+            isTargetPath: ConfigSync.prototype.isTargetPath,
+            filenameWithUnifiedKey: ConfigSync.prototype.filenameWithUnifiedKey,
+            filenameToUnifiedKey: ConfigSync.prototype.filenameToUnifiedKey,
+        });
+        return { ...fixture, rows };
+    }
+
+    it.each([MODE_PAUSED, MODE_AUTOMATIC])("does not collect a new file registered with mode %s", async (mode) => {
+        const fixture = setupMode(mode);
+
+        await fixture.configSync.scanAllConfigFiles(false);
+
+        expect(fixture.storeCustomizationFiles).not.toHaveBeenCalled();
+        expect(fixture.storeCustomisationFileV2).not.toHaveBeenCalled();
+        expect(fixture.deleteConfigOnDatabase).not.toHaveBeenCalled();
+    });
+
+    it.each([MODE_PAUSED, MODE_AUTOMATIC])("preserves existing documents for mode %s", async (mode) => {
+        const fixture = setupMode(mode);
+        fixture.rows.push({ _id: legacyWorkspace, path: legacyWorkspace }, { _id: v2Workspace, path: v2Workspace });
+
+        await fixture.configSync.scanAllConfigFiles(false);
+
+        expect(fixture.events).toEqual([]);
+    });
+
+    it.each([MODE_PAUSED, MODE_AUTOMATIC])(
+        "preserves excluded documents when the local file is absent (mode %s)",
+        async (mode) => {
+            const fixture = setupMode(mode, []);
+            fixture.rows.push({ _id: legacyWorkspace, path: legacyWorkspace }, { _id: v2Workspace, path: v2Workspace });
+
+            await fixture.configSync.scanAllConfigFiles(false);
+
+            expect(fixture.events).toEqual([]);
+        }
+    );
+
+    it("retains case-insensitive exclusions without protecting unrelated missing files", async () => {
+        const fixture = setupMode(MODE_PAUSED, [workspace], ["WORKSPACE.json"]);
+        fixture.rows.push(
+            { _id: legacyWorkspace, path: legacyWorkspace },
+            { _id: `${prefix}CONFIG/stale.json.md`, path: `${prefix}CONFIG/stale.json.md` }
+        );
+
+        await fixture.configSync.scanAllConfigFiles(false);
+
+        expect(fixture.events).toEqual([`delete:${prefix}CONFIG/stale.json.md`]);
+    });
+
+    it.each([undefined, MODE_SELECTIVE, MODE_SHINY])("continues to collect files with mode %s", async (mode) => {
+        const fixture = setupMode(mode);
+
+        await fixture.configSync.scanAllConfigFiles(false);
+
+        expect(fixture.events).toEqual([`store:${workspace}`]);
+    });
+
+    it.each([{ registeredFiles: [] }, { registeredFiles: ["different.json"] }])(
+        "a paused entry covers its file even when the recorded file list is $registeredFiles",
+        async ({ registeredFiles }) => {
+            const fixture = setupMode(MODE_PAUSED, [workspace], registeredFiles);
+
+            await fixture.configSync.scanAllConfigFiles(false);
+
+            expect(fixture.events).toEqual([]);
+        }
+    );
+
+    it("an automatic entry relies on its recorded file list, so an empty list leaves the file collected", async () => {
+        const fixture = setupMode(MODE_AUTOMATIC, [workspace], []);
+
+        await fixture.configSync.scanAllConfigFiles(false);
+
+        expect(fixture.events).toEqual([`store:${workspace}`]);
+    });
+
+    it("preserves an excluded plug-in group even when all its local files are absent", async () => {
+        const fixture = setupMode(MODE_PAUSED, [], ["plugins/example/main.js", "plugins/example/manifest.json"]);
+        fixture.rows.push({ _id: `${prefix}PLUGIN_MAIN/example.md`, path: `${prefix}PLUGIN_MAIN/example.md` });
+
+        await fixture.configSync.scanAllConfigFiles(false);
+
+        expect(fixture.events).toEqual([]);
+    });
+});
+
+describe.each([
+    { usePluginSyncV2: false, usePluginEtc: false },
+    { usePluginSyncV2: false, usePluginEtc: true },
+    { usePluginSyncV2: true, usePluginEtc: false },
+    { usePluginSyncV2: true, usePluginEtc: true },
+])("ConfigSync saved PLUGIN_ETC retention ($usePluginSyncV2, $usePluginEtc)", (settings) => {
+    it.each([
+        { mode: MODE_PAUSED, present: true },
+        { mode: MODE_PAUSED, present: false },
+        { mode: MODE_AUTOMATIC, present: true },
+        { mode: MODE_AUTOMATIC, present: false },
+    ])("preserves the excluded snapshot (mode $mode, local file present: $present)", async ({ mode, present }) => {
+        const path = ".obsidian/plugins/example/cache.json";
+        const saved = `${prefix}PLUGIN_ETC/example%cache.json`;
+        const stale = `${prefix}CONFIG/stale.json.md`;
+        const fixture = setup(present ? [path] : [], [
+            { _id: saved, path: saved },
+            { _id: stale, path: stale },
+        ]);
+        Object.assign(fixture.configSync.core.settings, {
+            ...settings,
+            pluginSyncExtendedSetting: {
+                "PLUGIN_ETC/example": {
+                    key: "PLUGIN_ETC/example",
+                    mode,
+                    files: ["plugins/example/cache.json"],
+                },
+            },
+        });
+        Object.assign(fixture.configSync, {
+            isTargetPath: ConfigSync.prototype.isTargetPath,
+            filenameWithUnifiedKey: ConfigSync.prototype.filenameWithUnifiedKey,
+            filenameToUnifiedKey: ConfigSync.prototype.filenameToUnifiedKey,
+        });
+
+        await fixture.configSync.scanAllConfigFiles(false);
+
+        expect(fixture.deleteConfigOnDatabase).toHaveBeenCalledExactlyOnceWith(stale);
+        expect(fixture.storeCustomizationFiles).not.toHaveBeenCalled();
+        expect(fixture.storeCustomisationFileV2).not.toHaveBeenCalled();
+        expect(fixture.configSync.isTargetPath(path)).toBe(settings.usePluginSyncV2 && settings.usePluginEtc);
+    });
 });
 
 describe("ConfigSync V2 scan behaviour", () => {

@@ -12,6 +12,47 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+### Improved
+
+#### Synchronisation
+
+- The configured automatic synchronisation is now visible, including after Fetch or Rebuild. (Upstream main, #1361)
+    - The bubble's live status line shows a badge ahead of the transfer status: 🔗 LiveSync mode, ⏰ Periodic synchronisation, ✨ at least one event trigger, or 🛎 manual synchronisation only. Enabled groups appear together, so `⏰ ✨` means periodic and event synchronisation are configured.
+    - The badge describes the settings; it does not establish that the device is connected or that file and database reflection is enabled. Unconfigured Vaults and P2P main remotes do not show it.
+    - Fetch and Rebuild disable automatic synchronisation and do not restore the previous mode, so the badge then shows 🛎.
+    - This fork shows the badge in the bubble only. Upstream draws it in the status bar and the editor overlay as well, surfaces this fork replaced with the bubble in 1.0.51.
+
+- Recurring plug-in version notices can be muted per device from **Joined devices** using **Mute version notices**, and reversed with **Unmute version notices**. (Upstream main, #1349)
+    - The choice is retained for this Vault on this device. Synchronisation compatibility checks remain enabled, and device records can still be removed under **… → Forget device record…**.
+    - This matters more here than upstream: the fork's version numbering runs ahead of plain upstream (1.0.59 against upstream 1.0.50), so any device still on an upstream release reports a version difference.
+
+### Fixed
+
+- The Docker Compose sample can re-run initialisation on an already configured CouchDB server and retain authentication and CORS settings when the container is recreated. (Upstream main, #1356)
+    - The initialisation check now authenticates, and a dedicated volume preserves runtime configuration. When updating an existing stack, save and transfer its settings as described in [Data & Backup](docker/README.md#data--backup) before recreating CouchDB.
+- CLI file lookups avoid repeated full Vault scans when locating files which have not arrived locally or have already been deleted. (Upstream main, #1347)
+    - Applies to Legacy file identity (`pathNormalizationVersion: 0`) with case-insensitive file-name handling. Matching directory branches are listed instead of scanning unrelated Vault subtrees.
+- Changes to files registered as **Ignore** or **Automatic** no longer create Customisation Sync snapshots during configuration scans. (Upstream main, #1359)
+    - Existing snapshots are retained. Exclusions still depend on each item's recorded file list; this change does not repair empty or outdated lists.
+- Hidden File Sync respects Customisation Sync's **Ignore** and **Selective** selections for registered paths containing uppercase letters. (Upstream main, #1359)
+
+### Recovery (in progress)
+
+- An unavailable local database can be reopened before synchronisation resumes, after a read of its current connection fails. Local file dispatch is held during replacement; failed completion requests an Obsidian restart. (Upstream main, #1360)
+    - Controlled Linux Obsidian recovery tests pass. Recovery on a physical iPhone remains unverified upstream.
+- Ordinary files which could not be reflected are retained. Failures at known local database or remote content-read boundaries are eligible for one automatic retry after the required resources recover. Failures without an established retry condition, and remaining failed attempts, are available through 'Review files which could not be reflected', including the Hatch action. (Upstream main, #1224, #1360)
+    - Native request failures carry their origin without relying on their message text. Reopening the same local database preserves retained work and consumed retry allowances.
+    - This work arrives together with Commonlib 0.6.0, which it requires.
+
+### Developer tools
+
+- The Review Harness adds individual guided diagnostics for controlled database connection loss and app background events. They record observations only; a run with no observed failure does not establish that a fix worked or provide automatic product recovery. (Upstream main, #1360)
+
+### Miscellaneous
+
+- Updated dependencies, including Commonlib 0.6.0.
+- The fork's reflection queue coalesces and releases documents by document id, so a repeated remote change replaces its queued predecessor instead of appending to it.
+
 ## 1.0.58
 
 14th November, 2026
