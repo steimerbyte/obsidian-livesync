@@ -12,6 +12,20 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+## 1.0.60
+
+19th November, 2026
+
+### Documentation
+
+- Adopted upstream's 1.0.51 release finalisation. (Upstream 1.0.51)
+    - The code of that release was already shipped here in 1.0.59; upstream published it as 1.0.51 the following day without further source changes.
+    - The recovery guide is reorganised around the now-published designs: local database connection recovery and file reflection recovery are recorded as accepted and included in 1.0.51 with Commonlib 0.6.0. Physical iPhone recovery remains unverified.
+    - **Review files which could not be reflected** is documented as its own settings reference, including when the automatic retry applies.
+    - The Review Harness diagnostics for database connection loss, background events, and transaction aborts are documented individually; a run with no observed failure does not establish that recovery works.
+    - The 1.0 release history now holds the 1.0.46 notes, which moved out of this file.
+    - No action is required for users. Behaviour is unchanged from 1.0.59.
+
 ## 1.0.59
 
 18th November, 2026
