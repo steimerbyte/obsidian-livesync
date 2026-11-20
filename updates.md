@@ -12,6 +12,25 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+## 1.0.61
+
+20th November, 2026
+
+### Improved
+
+#### Setup and recovery
+
+- Adding a device now reviews the automatic synchronisation settings which Fetch disables, and how to restore them, before the restart is chosen. (Upstream main, #1367)
+    - The existing-user dialogue offers only **Next**; the restart is a separate confirmation naming the action, so the settings review and the restart are two distinct decisions.
+    - CouchDB and Object Storage point to **Sync Settings**, P2P points to **P2P Status**. Both ask you to wait for the files and review them before automatic options are re-enabled. Fetch still does not restore the previous mode, so the bubble shows 🛎 after a Fetch.
+- Fetch which stops on a file body or chunk marked as encrypted in a format this E2EE reader cannot decode now explains how to recover, instead of reporting a bare error. (Upstream main, #1365)
+    - In Obsidian, a notice offers **View recovery steps** and names the rebuild action in your language. The CLI prints the same steps with the `rebuild --force` and `fetch --force` commands.
+    - This reports a recovery route; it does not decrypt or repair the affected documents. Fetch continues to fail until the remote database has been rebuilt from a device whose Vault holds the needed files.
+
+### Miscellaneous
+
+- Updated Commonlib to 0.6.1, which supplies the unsupported-format error and the Fetch failure reporting this guidance relies on. (Upstream main, #1365)
+
 ## 1.0.60
 
 19th November, 2026
