@@ -4,7 +4,9 @@ import { ObsidianRebuilder } from "./ObsidianRebuilder.ts";
 
 function createRebuilder() {
     const askInPopup = vi.fn();
-    const confirmWithMessage = vi.fn(async () => "Close");
+    const confirmWithMessage = vi.fn(
+        async (_title: string, _message: string, _buttons: string[], _defaultAction: string) => "Close"
+    );
     const services = {
         UI: { confirm: { askInPopup, confirmWithMessage } },
         setting: { suspendAllSync: { addHandler: vi.fn() } },
