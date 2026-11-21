@@ -12,6 +12,13 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+- Splitting large files with V3 Rabin-Karp chunking uses less input-buffer memory by reading Blobs in blocks of up to 1 MiB as Chunks are produced, rather than loading the entire Blob into memory at once. (Upstream main)
+    - Small files which fit within one block are read directly without creating a block iterator, and prepared Chunk batches pass straight to the writer without an extra array copy.
+
+### Miscellaneous
+
+- Updated dependencies to `@vrtmrz/livesync-commonlib` 0.7.0, which adopts `@vrtmrz/rpc` 0.1.0 for hosted P2P rooms, and `octagonal-wheels` 0.1.57. (Upstream main)
+
 ## 1.0.61
 
 20th November, 2026
