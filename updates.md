@@ -12,6 +12,10 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+## 1.0.63
+
+22nd November, 2026
+
 ### Fixed
 
 - In CouchDB LiveSync mode, an offline start can recover when the device returns online with the Vault in the foreground. A continuous start that failed because of a confirmed connection problem is tried once on that return. Its initial pull lets waiting files resume through the usual recovery process. (Upstream main, #1224)
