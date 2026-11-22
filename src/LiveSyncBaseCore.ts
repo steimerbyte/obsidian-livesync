@@ -30,8 +30,8 @@ import {
     composeCoreFeatures,
     initialiseSharedCoreFeatures,
     type HostFeatureInitialiser,
-    type LiveSyncCoreFeatureViews,
 } from "./serviceFeatures/coreFeatures";
+import type { ReplicationSchedulingViews } from "./serviceFeatures/replicationScheduling";
 
 export type { LiveSyncCoreFeatureViews } from "./serviceFeatures/coreFeatures";
 
@@ -287,7 +287,7 @@ export class LiveSyncBaseCore<
      * Initialise ServiceFeatures.
      * (Please refer `serviceFeatures` for more details)
      */
-    initialiseServiceFeatures(): Pick<LiveSyncCoreFeatureViews, "replicationScheduling"> {
+    initialiseServiceFeatures(): ReplicationSchedulingViews {
         const views = initialiseSharedCoreFeatures(this);
         // The fork's start-up progress boundaries belong with the shared features.
         useStartupProgressFeature(this);

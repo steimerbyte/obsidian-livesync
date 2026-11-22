@@ -214,9 +214,11 @@ export class SyncStatusBubble {
         const labels = log?.statusBarLabels?.value;
         const parts = labels?.parts ?? [];
         const stats = this.core.services.replicator?.replicationStatics?.value;
-        const partValue = (key: string) => parts.find((part) => part.key === key)?.value ?? 0;
+        const numericValue = (part: { value?: number | string } | undefined) =>
+            typeof part?.value === "number" ? part.value : 0;
+        const partValue = (key: string) => numericValue(parts.find((part) => part.key === key));
         const queueText = parts
-            .filter((part) => QUEUE_PART_KEYS[part.key] && (part.value ?? 0) > 0)
+            .filter((part) => QUEUE_PART_KEYS[part.key] && numericValue(part) > 0)
             .map((part) => `${part.text.trim()} ${part.value}`)
             .join(" ");
         const configActive =

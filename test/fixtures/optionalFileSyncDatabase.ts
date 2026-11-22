@@ -58,6 +58,8 @@ export async function createOptionalFileSyncDatabase() {
             onUnloadDatabase: async () => true,
         },
         replicator: { onCloseActiveReplication: async () => true },
+        // The fork refuses configuration files above the synchronisation size limit.
+        vault: { isFileSizeTooLarge: () => false },
     };
     const localDatabase = new LiveSyncLocalDB(name, { services } as unknown as LiveSyncLocalDBEnv);
     if (!(await localDatabase.initializeDatabase())) {

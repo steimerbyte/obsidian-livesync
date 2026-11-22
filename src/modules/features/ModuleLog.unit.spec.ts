@@ -87,7 +87,7 @@ describe("ModuleLog service connection", () => {
         expect(second.sink).not.toHaveBeenCalled();
         await first.module.logResource.dispose();
         first.sink.mockClear();
-        const consoleLog = vi.spyOn(console, "log").mockImplementation(() => undefined);
+        const consoleLog = vi.spyOn(console, "debug").mockImplementation(() => undefined);
         first.services.context.events.emitEvent("p2p-diagnostic", {
             category: "peer",
             code: "peer-left",
@@ -168,7 +168,7 @@ describe("ModuleLog service connection", () => {
         const { services, module, sink } = await createHarness();
         await services.appLifecycle.onSettingLoaded();
         sink.mockClear();
-        const consoleLog = vi.spyOn(console, "log").mockImplementation(() => undefined);
+        const consoleLog = vi.spyOn(console, "debug").mockImplementation(() => undefined);
 
         await module.logResource.dispose();
         try {
@@ -200,7 +200,7 @@ describe("ModuleLog service connection", () => {
         const { services, module, sink } = await createHarness();
         await services.appLifecycle.onSettingLoaded();
         sink.mockClear();
-        const consoleLog = vi.spyOn(console, "log").mockImplementation(() => undefined);
+        const consoleLog = vi.spyOn(console, "debug").mockImplementation(() => undefined);
         const circular: { self?: unknown } = {};
         circular.self = circular;
 
@@ -228,7 +228,7 @@ describe("ModuleLog service connection", () => {
         await second.services.appLifecycle.onSettingLoaded();
         first.sink.mockClear();
         second.sink.mockClear();
-        const consoleLog = vi.spyOn(console, "log").mockImplementation(() => undefined);
+        const consoleLog = vi.spyOn(console, "debug").mockImplementation(() => undefined);
 
         try {
             await first.module.logResource.dispose();
@@ -270,7 +270,7 @@ describe("ModuleLog service connection", () => {
     it("retires a connection which never reached the settings-loaded phase", async () => {
         const { services, module, sink, Logger } = await createHarness();
         services.API.addLog("pending");
-        const consoleLog = vi.spyOn(console, "log").mockImplementation(() => undefined);
+        const consoleLog = vi.spyOn(console, "debug").mockImplementation(() => undefined);
         try {
             await module.logResource.dispose();
             Logger("after-disposal");
@@ -352,7 +352,7 @@ describe("ModuleLog service connection", () => {
                     "moduleLiveSyncMain.logUnloadingPlugin"
                 );
             }
-            const consoleLog = vi.spyOn(console, "log").mockImplementation(() => undefined);
+            const consoleLog = vi.spyOn(console, "debug").mockImplementation(() => undefined);
             try {
                 expect(() => services.API.addLog("late-after-close", 32, "late-after-close")).not.toThrow();
                 expect(consoleLog).toHaveBeenCalledWith({
@@ -383,7 +383,7 @@ describe("ModuleLog log retention", () => {
     it("always publishes the warning lines", async () => {
         const { module, core } = await createHarness();
         core.settings = {} as never;
-        module.activeFileStatus.value = "Not synchronised: test";
+        module.activeFileStatus.value = { kind: "excluded", message: "Not synchronised: test" };
 
         await module.updateMessageArea();
 

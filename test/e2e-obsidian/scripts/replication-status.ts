@@ -22,8 +22,8 @@ type TestReplicationStatics = {
     syncStatus: "CONNECTED" | "PAUSED" | "ERRORED";
     couchDB: {
         phase: "continuous" | "idle";
-        pull: { checkedChanges: number; completedBatches: number; checking: boolean };
-        push: { checkedChanges: number; completedBatches: number; checking: boolean };
+        pull: { checkedChanges: number; completedBatches: number; lastSeq: string | number; checking: boolean };
+        push: { checkedChanges: number; completedBatches: number; lastSeq: string | number; checking: boolean };
     };
 };
 
@@ -45,7 +45,9 @@ type TestWorkspace = {
 };
 type TestLogModule = {
     statusLog?: WritableSource<string>;
-    activeFileStatus?: WritableSource<string>;
+    activeFileStatus?: WritableSource<
+        { kind: "none"; message: "" } | { kind: "excluded" | "warning"; message: string }
+    >;
     p2pLogCollector?: { p2pReplicationStats: WritableSource<readonly P2PReplicationProgress[]> };
     statusBarLabels?: WritableSource<{ parts: readonly StatusPart[]; message: string }>;
     __addLog?: (message: unknown, level?: number, key?: string) => void;
@@ -116,8 +118,13 @@ function replicationStats(
         syncStatus: "CONNECTED",
         couchDB: {
             phase: "continuous",
-            pull: { checkedChanges, completedBatches: 0, checking: true },
-            push: { checkedChanges: pushCheckedChanges, completedBatches: 0, checking: pushCheckedChanges > 0 },
+            pull: { checkedChanges, completedBatches: 0, lastSeq: "1-e2e", checking: true },
+            push: {
+                checkedChanges: pushCheckedChanges,
+                completedBatches: 0,
+                lastSeq: "1-e2e",
+                checking: pushCheckedChanges > 0,
+            },
         },
     };
 }
@@ -423,7 +430,7 @@ async function assertDirectionalComparison(page: Page): Promise<void> {
         return moduleLog?.statusBarLabels?.value.message;
     });
     failUnless(
-        labels?.includes("(⏩↑ 1) (⏩↓ 1) ↑ 0 (LIVE) ↓ 0 (LIVE)"),
+        labels?.includes("(⏩↑ 1) (⏩↓ 1) ↑ 0 (0) ↓ 0 (0)"),
         `The plain-text status did not distinguish comparison directions from transfers: ${labels}`
     );
     console.log(
@@ -440,9 +447,11 @@ async function assertLegacyStatusPaths(page: Page): Promise<void> {
             return (entry as TestLogModule).statusBarLabels !== undefined;
         });
         const services = core?.services;
-        const settings = services?.setting?.currentSettings?.();
+        const setting = services?.setting;
+        const settings = setting?.currentSettings?.();
         if (
             !settings ||
+            !setting?.applyPartial ||
             !services?.replication ||
             !services.fileProcessing ||
             !services.conflict ||
@@ -469,14 +478,14 @@ async function assertLegacyStatusPaths(page: Page): Promise<void> {
             p2p: p2p.value,
             hideFileWarningNotice: settings.hideFileWarningNotice,
         };
-        const peerLine = "⚡ E2E peer ↑ seq 11 (12) ↓ seq 13 (14)";
+        const peerLine = "⚡ E2E peer ↑ ‒ (1) ↓ ‒ (1)";
         const liveText = () =>
             document.querySelector<HTMLElement>(".livesync-bubble .lsb-live-status")?.textContent ?? "";
         const wait = {
-            async until(condition: () => boolean, message: string) {
+            async until(condition: () => boolean, message: string | (() => string)) {
                 const deadline = Date.now() + timeout;
                 while (!condition()) {
-                    if (Date.now() >= deadline) throw new Error(message);
+                    if (Date.now() >= deadline) throw new Error(typeof message === "function" ? message() : message);
                     await new Promise((resolve) => setTimeout(resolve, 20));
                 }
             },
@@ -491,8 +500,8 @@ async function assertLegacyStatusPaths(page: Page): Promise<void> {
                     fetching: { current: 13, max: 14, isActive: true },
                 },
             ];
-            settings.hideFileWarningNotice = false;
-            warning.value = "E2E file warning";
+            await setting.applyPartial({ hideFileWarningNotice: false }, true);
+            warning.value = { kind: "warning", message: "E2E file warning" };
             await wait.until(
                 () => counters.every(({ mark, value }) => liveText().includes(`${mark}${value}`)),
                 "Queue values did not reach the status bubble."
@@ -509,7 +518,7 @@ async function assertLegacyStatusPaths(page: Page): Promise<void> {
                 throw new Error("The plain-text status lost a queue count or its separate P2P line.");
             }
             settings.hideFileWarningNotice = true;
-            warning.value = "E2E file warning as an icon";
+            warning.value = { kind: "warning", message: "E2E file warning as an icon" };
             await wait.until(
                 () => liveText().includes("⛔ SKIP") && !liveText().includes("E2E file warning"),
                 "The file warning did not switch to its existing compact icon."
@@ -523,7 +532,7 @@ async function assertLegacyStatusPaths(page: Page): Promise<void> {
             counters.forEach(({ source }, index) => {
                 source.value = previous.counters[index];
             });
-            settings.hideFileWarningNotice = previous.hideFileWarningNotice;
+            await setting.applyPartial({ hideFileWarningNotice: previous.hideFileWarningNotice }, true);
             p2p.value = previous.p2p;
             warning.value = previous.warning;
         }
