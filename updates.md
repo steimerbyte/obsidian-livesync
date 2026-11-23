@@ -12,6 +12,10 @@ Earlier releases remain available in the 1.0 release history, the 1.0 preview hi
 
 ## Unreleased
 
+## 1.0.64
+
+23rd November, 2026
+
 ### Miscellaneous
 
 - Upstream 1.0.52 is documentation only. The 1.0.47 release history now also lives in the 1.0 release history, and the file reflection recovery design records the offline-start follow-up as released in 1.0.52 with Commonlib 0.7.0. Synchronisation behaviour is unchanged from 1.0.63.
